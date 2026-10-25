@@ -1,0 +1,7 @@
+# Benign sessions are split once, by design, before any scoring is looked at.
+#   tuning: used to build baselines and to set thresholds
+#   test:   never used for either; reported separately in the eval
+# Test deliberately includes hard cases (sensitive files, SSH, MCP, vendored docs) and one
+# session (b05) whose network domain is only known to the baseline via another session (b12).
+tuning: [s-b00, s-b01, s-b03, s-b04, s-b06, s-b09, s-b10, s-b11, s-b12, s-b13]
+test:   [s-b02, s-b05, s-b07, s-b08, s-b14]

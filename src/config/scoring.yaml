@@ -1,0 +1,9 @@
+# Session risk score (PRD FR-8): deterministic, capped at 100, with a breakdown.
+points:            # added for each rule hit
+  critical: 40
+  high: 25
+  medium: 10
+  low: 5
+drift_cap: 20      # event + window drift together can add at most this much
+judge_cap: 30      # session judge, only when enabled
+threshold: 50      # a session is flagged when its score reaches this

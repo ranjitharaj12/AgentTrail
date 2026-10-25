@@ -23,6 +23,7 @@ CONDITIONS
 
 COMPUTED FIELDS usable in nodes (not stored on events):
   after_first_prompt, path_in_intent, mcp_server_in_intent,
+  domain_new            net_dest is absent from the project's baseline (False if no baseline)
   signals               ids of single-event rules that fired on this event
   any_step_path_in_intent   (severity_overrides of sequence rules) an earlier step touched a path the user named
 
@@ -41,6 +42,7 @@ from pathlib import Path
 
 import yaml
 
+from agenttrail.baseline import Baseline
 from agenttrail.enrich import command_binary
 from agenttrail.schema import Event, EventType
 
@@ -240,8 +242,11 @@ def _path_in_intent(ev: Event, home: str) -> bool:
     return False
 
 
-def _context(ev: Event, first_prompt_seq: int | None, home: str, signals: list[str]) -> dict:
+def _context(ev: Event, first_prompt_seq: int | None, home: str, signals: list[str],
+             baseline: Baseline | None = None) -> dict:
     return {
+        "domain_new": bool(baseline and ev.net_dest and baseline.has_project(ev.project)
+                           and not baseline.knows_domain(ev.project, ev.net_dest)),
         "after_first_prompt": first_prompt_seq is not None and ev.seq > first_prompt_seq,
         "path_in_intent": _path_in_intent(ev, home),
         "mcp_server_in_intent": bool(ev.mcp_server and ev.intent
@@ -342,15 +347,18 @@ CHECKS = {"unreported_action": _unreported_action}
 # ---------- running ----------
 
 
-def run_rules(events: list[Event], rules: list[Rule], home: str = "/home/dev") -> list[Hit]:
-    """Order matters: event rules, then sequences (which can read event-rule signals), then checks."""
+def run_rules(events: list[Event], rules: list[Rule], home: str = "/home/dev",
+              baseline: Baseline | None = None) -> list[Hit]:
+    """Order matters: event rules, then sequences (which can read event-rule signals), then checks.
+
+    Without a baseline, baseline-dependent fields (domain_new) are False, so R-02 stays quiet."""
     events = sorted(events, key=lambda e: e.seq)
     fields = [e.model_dump(mode="json") for e in events]
     first_prompt = next((e.seq for e in events if e.event_type == EventType.user_prompt), None)
 
     signals: dict[str, list[str]] = {e.event_id: [] for e in events}
     hits: list[Hit] = []
-    base_ctx = [_context(e, first_prompt, home, []) for e in events]
+    base_ctx = [_context(e, first_prompt, home, [], baseline) for e in events]
 
     for rule in (r for r in rules if r.kind == "event"):
         for i, ev in enumerate(events):
@@ -358,7 +366,7 @@ def run_rules(events: list[Event], rules: list[Rule], home: str = "/home/dev") -
                 hits.append(_hit(rule, ev, _severity(rule, fields[i], base_ctx[i])))
                 signals[ev.event_id].append(rule.id)
 
-    ctxs = [_context(e, first_prompt, home, signals[e.event_id]) for e in events]
+    ctxs = [_context(e, first_prompt, home, signals[e.event_id], baseline) for e in events]
     for rule in (r for r in rules if r.kind == "sequence"):
         hits += _run_sequence(rule, events, fields, ctxs)
 

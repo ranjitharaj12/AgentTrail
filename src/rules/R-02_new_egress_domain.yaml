@@ -1,0 +1,9 @@
+id: R-02
+title: Network access to a domain not in the project baseline
+description: A network call to a domain the project's benign tuning sessions never used. Inert when no baseline is supplied.
+severity: medium
+atlas: [AML.T0086]          # provisional: verify against atlas.mitre.org
+match:
+  event_type: tool_decision
+  decision: accept
+  domain_new: true
