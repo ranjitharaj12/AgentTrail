@@ -1,0 +1,28 @@
+[
+  {"session_id": "s-b00", "seq": 1, "ts": "2026-10-01T09:00:00Z", "project": "demo-app",
+   "event_type": "user_prompt", "turn_id": "p1",
+   "prompt_text": "Fix the failing test in tests/test_cart.py"},
+
+  {"session_id": "s-b00", "seq": 2, "ts": "2026-10-01T09:00:03Z", "project": "demo-app",
+   "event_type": "tool_decision", "turn_id": "p1", "tool": "Read", "tool_source": "builtin",
+   "tool_use_id": "t1", "decision": "accept", "permission_mode": "default",
+   "args": {"file_path": "/work/demo-app/tests/test_cart.py"}},
+
+  {"session_id": "s-b00", "seq": 3, "ts": "2026-10-01T09:00:03Z", "project": "demo-app",
+   "event_type": "tool_result", "turn_id": "p1", "tool": "Read", "tool_source": "builtin",
+   "tool_use_id": "t1", "outcome": "success", "result_size": 1840},
+
+  {"session_id": "s-b00", "seq": 4, "ts": "2026-10-01T09:00:10Z", "project": "demo-app",
+   "event_type": "tool_decision", "turn_id": "p1", "tool": "Bash", "tool_source": "builtin",
+   "tool_use_id": "t2", "decision": "accept", "permission_mode": "default",
+   "stated_purpose": "Run the cart tests to see the failure",
+   "args": {"command": "pytest tests/test_cart.py", "description": "Run the cart tests to see the failure"}},
+
+  {"session_id": "s-b00", "seq": 5, "ts": "2026-10-01T09:00:14Z", "project": "demo-app",
+   "event_type": "tool_result", "turn_id": "p1", "tool": "Bash", "tool_source": "builtin",
+   "tool_use_id": "t2", "outcome": "failure", "result_size": 920},
+
+  {"session_id": "s-b00", "seq": 6, "ts": "2026-10-01T09:00:30Z", "project": "demo-app",
+   "event_type": "assistant_response", "turn_id": "p1",
+   "response": "The test fails because the cart total ignores quantity. I read the test and ran it; no code changed yet."}
+]

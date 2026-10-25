@@ -1,0 +1,15 @@
+id: R-05
+title: Destructive command outside the project
+description: rm -rf reaching beyond the project, force-pushes, and disk tools.
+severity: high
+atlas: [AML.T0053]          # provisional: verify against atlas.mitre.org
+match:
+  event_type: tool_decision
+  decision: accept
+  tool: Bash
+  any:
+    # Recursive delete only counts when it touches something outside the project
+    - args.command: {regex: '\brm\s+(?:-\S+\s+)*-\S*[rR]'}
+      path_class: [home, system, sensitive]
+    - args.command: {regex: '\bgit\s+push\b.*(--force\b|--force-with-lease|\s-f\b)'}
+    - args.command: {regex: '\b(mkfs(\.\w+)?|dd\s+if=|shred|wipefs|diskutil\s+(erase|partition))\b'}

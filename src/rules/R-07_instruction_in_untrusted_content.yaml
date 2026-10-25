@@ -1,0 +1,22 @@
+id: R-07
+title: Instruction-like text in low-trust content before a risky action
+description: A vendored file, web page or MCP result contains text addressed to the agent, and a rule fires shortly after with no new user prompt.
+severity: high
+atlas: [AML.T0051]          # provisional: verify against atlas.mitre.org
+sequence:
+  - name: source
+    match:
+      event_type: tool_result
+      trust_level: [third_party, web, mcp_result]
+      content_excerpt:
+        any_regex:
+          - '(?i)\b(note|message|instructions?|important|todo)\b[^.\n]{0,20}\b(to|for)\s+(the\s+)?(ai|assistants?|agents?|llm|model|claude)\b'
+          - '(?i)\bignore\s+(all\s+|any\s+)?(previous|prior|above)\s+instructions\b'
+          - '(?i)\bdo(n''t|\s+not)\s+(mention|tell|reveal|inform)\b'
+          - '(?i)\bbefore\s+(you\s+)?(continue|proceed|summari[sz]ing)\b.*\b(read|send|post|upload|run)\b'
+  - name: risky_action
+    within: 6
+    no_prompt_between: true
+    match:
+      event_type: tool_decision
+      signals: [R-01, R-04, R-05]

@@ -1,0 +1,22 @@
+id: R-03
+title: Sensitive read followed by network egress (toxic flow)
+description: Credentials or keys are read, and later in the same session a shell command sends data to the network.
+severity: critical
+atlas: [AML.T0086]          # provisional: verify against atlas.mitre.org
+# If the user's own prompt named the sensitive file, treat it as a lead, not a certainty.
+severity_overrides:
+  - when: {any_step_path_in_intent: true}
+    severity: medium
+sequence:
+  - name: sensitive_read
+    match:
+      event_type: tool_decision
+      decision: accept
+      path_class: sensitive
+      action_type: [read, exec]
+  - name: egress
+    match:
+      event_type: tool_decision
+      decision: accept
+      tool: Bash
+      action_type: network

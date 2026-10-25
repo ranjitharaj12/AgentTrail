@@ -1,0 +1,8 @@
+id: R-11
+title: Environment change mid-session
+description: A new MCP server connects or a plugin loads after the first user prompt.
+severity: medium
+atlas: [AML.T0010]          # provisional: verify against atlas.mitre.org
+match:
+  event_type: [mcp_server_connection, plugin_loaded]
+  after_first_prompt: true

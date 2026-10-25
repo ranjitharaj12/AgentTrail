@@ -1,0 +1,28 @@
+id: R-04
+title: Write to a persistence location
+description: Shell profiles, cron, authorized_keys, git hooks and launch agents survive the session.
+severity: high
+atlas: [AML.T0053]          # provisional: verify against atlas.mitre.org
+match:
+  event_type: tool_decision
+  decision: accept
+  any:
+    # Editor-style tools writing to a persistence path
+    - tool: [Edit, Write, MultiEdit]
+      paths:
+        any_regex:
+          - '(^|/)\.(zshrc|zshenv|zprofile|bashrc|bash_profile|bash_login|profile)$'
+          - '/\.ssh/authorized_keys$'
+          - '/\.git/hooks/[^/]+$'
+          - '^/(etc/cron|var/spool/cron)'
+          - '/Library/Launch(Agents|Daemons)/'
+    # Shell commands that append or install into one
+    - tool: Bash
+      args.command:
+        any_regex:
+          - '(>>?|\btee\b(\s+-a)?)\s*\S*(\.zshrc|\.zshenv|\.zprofile|\.bashrc|\.bash_profile|\.profile|authorized_keys)'
+          - '>>?\s*\S*/\.git/hooks/'
+          - '\|\s*crontab\s+-(\s|$)'
+          - '\bcrontab\s+-e\b'
+          - '\blaunchctl\s+load\b'
+          - '\bsystemctl\s+(--user\s+)?enable\b'

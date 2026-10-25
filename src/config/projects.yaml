@@ -1,0 +1,8 @@
+# Maps each project name (the OTel resource attribute) to where it lives.
+# Used to classify file paths: inside root = project, under home = home, else system.
+home: /home/dev
+projects:
+  demo-app:
+    root: /work/demo-app
+    # Code under these folders is third-party even though it sits inside the project.
+    vendored_dirs: [vendor, node_modules, third_party]

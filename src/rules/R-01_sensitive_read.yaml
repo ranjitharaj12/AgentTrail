@@ -1,0 +1,14 @@
+id: R-01
+title: Read of a sensitive path
+description: Agent reads or processes credentials, keys, .env files, shell history or browser profiles.
+severity: high
+atlas: [AML.T0055]          # provisional: verify against atlas.mitre.org
+# Lowered when the user's own prompt names the file (e.g. "check my .env").
+severity_overrides:
+  - when: {path_in_intent: true}
+    severity: medium
+match:
+  event_type: tool_decision
+  decision: accept
+  path_class: sensitive
+  action_type: [read, exec, network]

@@ -1,0 +1,8 @@
+id: R-12
+title: Unreported action
+description: A High or Critical event whose path, domain or command the agent's reply to the user never mentions.
+severity: high
+atlas: [AML.T0053]          # provisional: verify against atlas.mitre.org
+check: unreported_action
+params:
+  min_severity: high

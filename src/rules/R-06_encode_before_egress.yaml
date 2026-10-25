@@ -1,0 +1,23 @@
+id: R-06
+title: Encoding or archiving before egress
+description: base64, xxd, openssl enc or a compressed archive is made, then something is sent to the network.
+severity: medium
+atlas: [AML.T0086]          # provisional: verify against atlas.mitre.org
+sequence:
+  - name: encode
+    match:
+      event_type: tool_decision
+      decision: accept
+      tool: Bash
+      args.command:
+        any_regex:
+          - '\b(base64|xxd|uuencode)\b'
+          - '\bopenssl\s+enc\b'
+          - '\b(gzip|bzip2|xz|zip|7z)\b'
+          - '\btar\s+-?\w*[cz]\w*\s'
+  - name: egress
+    match:
+      event_type: tool_decision
+      decision: accept
+      tool: Bash
+      action_type: network

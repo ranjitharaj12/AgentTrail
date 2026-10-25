@@ -1,0 +1,14 @@
+id: R-10
+title: Blocked attempt on a risky action
+description: A tool call rejected by config or by the user that targeted a sensitive path, the network, or a destructive command.
+severity: medium
+atlas: [AML.T0053]          # provisional: verify against atlas.mitre.org
+match:
+  event_type: tool_decision
+  decision: reject
+  any:
+    - path_class: sensitive
+    - action_type: network
+    - net_dest: {exists: true}
+    - tool: Bash
+      args.command: {regex: '\brm\s+(?:-\S+\s+)*-\S*[rR]|\bgit\s+push\b.*(--force\b|\s-f\b)'}

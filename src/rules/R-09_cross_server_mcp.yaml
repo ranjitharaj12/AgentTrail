@@ -1,0 +1,20 @@
+id: R-09
+title: Cross-server MCP flow
+description: Data is read through one MCP server, then written out through a different one that the user's prompt did not mention.
+severity: high
+atlas: [AML.T0086]          # provisional: verify against atlas.mitre.org
+sequence:
+  - name: read
+    match:
+      event_type: tool_decision
+      decision: accept
+      tool_source: mcp
+      tool: {regex: '__(get|read|list|search|fetch|query|download|find)'}
+  - name: write
+    match:
+      event_type: tool_decision
+      decision: accept
+      tool_source: mcp
+      tool: {regex: '__(send|post|create|write|update|delete|comment|publish|upload|push|add)'}
+      mcp_server: {ne_step: read.mcp_server}
+      mcp_server_in_intent: false
