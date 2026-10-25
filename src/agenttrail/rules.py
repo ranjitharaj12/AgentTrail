@@ -24,7 +24,7 @@ CONDITIONS
 COMPUTED FIELDS usable in nodes (not stored on events):
   after_first_prompt, path_in_intent, mcp_server_in_intent,
   domain_new            net_dest is absent from the project's baseline (False if no baseline)
-  signals               ids of single-event rules that fired on this event
+  signals               ids of single-event rules (and D-01 drift flags) that fired on this event
   any_step_path_in_intent   (severity_overrides of sequence rules) an earlier step touched a path the user named
 
 SEQUENCES. Steps must match distinct events in increasing order. A step may add
@@ -348,10 +348,12 @@ CHECKS = {"unreported_action": _unreported_action}
 
 
 def run_rules(events: list[Event], rules: list[Rule], home: str = "/home/dev",
-              baseline: Baseline | None = None) -> list[Hit]:
+              baseline: Baseline | None = None, drift=None) -> list[Hit]:
     """Order matters: event rules, then sequences (which can read event-rule signals), then checks.
 
-    Without a baseline, baseline-dependent fields (domain_new) are False, so R-02 stays quiet."""
+    Without a baseline, baseline-dependent fields (domain_new) are False, so R-02 stays quiet.
+    `drift` is a DriftResult (duck-typed: .hits, .flagged_event_ids). Its D-01 hits are added to the
+    output and its flagged events carry the `D-01` signal, which sequence rules such as R-08 can read."""
     events = sorted(events, key=lambda e: e.seq)
     fields = [e.model_dump(mode="json") for e in events]
     first_prompt = next((e.seq for e in events if e.event_type == EventType.user_prompt), None)
@@ -365,6 +367,11 @@ def run_rules(events: list[Event], rules: list[Rule], home: str = "/home/dev",
             if _node_matches(rule.match, fields[i], base_ctx[i]):
                 hits.append(_hit(rule, ev, _severity(rule, fields[i], base_ctx[i])))
                 signals[ev.event_id].append(rule.id)
+
+    if drift is not None:
+        hits += drift.hits
+        for eid in drift.flagged_event_ids:
+            signals[eid].append("D-01")
 
     ctxs = [_context(e, first_prompt, home, signals[e.event_id], baseline) for e in events]
     for rule in (r for r in rules if r.kind == "sequence"):

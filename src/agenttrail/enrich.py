@@ -111,6 +111,8 @@ def classify_path(p: str, root: str, home: str) -> PathClass:
 
 URL_RE = re.compile(r"https?://[^\s'\"<>]+")
 NET_BINARIES = {"curl", "wget", "nc", "ncat", "scp", "sftp", "rsync", "ssh"}
+# Commands that only print or filter text: a URL inside them is just text, not a request.
+TEXT_BINARIES = {"echo", "printf", "cat", "grep", "rg", "sed", "awk", "head", "tail", "less", "wc", "tee"}
 
 
 def extract_net_dest(ev: Event) -> str | None:
@@ -159,7 +161,7 @@ def action_type(ev: Event, net_dest: str | None) -> str | None:
         return "network"
     if ev.tool == "Bash":
         binary = command_binary(str(ev.args.get("command", ""))) or ""
-        if binary in NET_BINARIES or net_dest:
+        if binary in NET_BINARIES or (net_dest and binary not in TEXT_BINARIES):
             return "network"
         if binary in {"rm", "rmdir", "shred", "dd", "mkfs"}:
             return "delete"
@@ -170,7 +172,7 @@ def action_type(ev: Event, net_dest: str | None) -> str | None:
 # ---------- trust ----------
 
 
-def trust_level(ev: Event, paths: list[str], proj: ProjectConfig) -> TrustLevel | None:
+def trust_level(ev: Event, paths: list[str], proj: ProjectConfig, action: str | None) -> TrustLevel | None:
     """Trust of the content this call brings into the agent's context."""
     if ev.event_type not in (EventType.tool_decision, EventType.tool_result):
         return None
@@ -182,7 +184,7 @@ def trust_level(ev: Event, paths: list[str], proj: ProjectConfig) -> TrustLevel 
         if any(f"/{d}/" in p for p in paths for d in proj.vendored_dirs):
             return TrustLevel.third_party
         return TrustLevel.user_authored
-    if ev.tool == "Bash" and extract_net_dest(ev):
+    if ev.tool == "Bash" and action == "network":      # only a real fetch brings web content in
         return TrustLevel.web
     return None
 
@@ -209,9 +211,9 @@ def enrich_session(events: list[Event], cfg: Config) -> list[Event]:
         classes = [classify_path(p, proj.root, cfg.home) for p in paths]
         path_class = max(classes, key=SEVERITY.get) if classes else None
         net = extract_net_dest(ev)
-        derived = dict(paths=paths, path_class=path_class, net_dest=net,
-                       action_type=action_type(ev, net),
-                       trust_level=trust_level(ev, paths, proj))
+        action = action_type(ev, net)
+        derived = dict(paths=paths, path_class=path_class, net_dest=net, action_type=action,
+                       trust_level=trust_level(ev, paths, proj, action))
 
         # A tool_result carries no arguments; inherit from its tool_decision.
         if ev.event_type == EventType.tool_decision and ev.tool_use_id:

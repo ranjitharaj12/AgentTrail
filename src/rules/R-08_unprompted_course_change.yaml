@@ -1,0 +1,16 @@
+id: R-08
+title: Unprompted course change after low-trust content
+description: The agent ingests a vendored file, web page or MCP result, then a rule fires or its behavior drifts from the user's intent, with no new user prompt in between. Names the content as the likely trigger.
+severity: critical
+atlas: [AML.T0051]          # provisional: verify against atlas.mitre.org
+sequence:
+  - name: low_trust_content
+    match:
+      event_type: tool_result
+      trust_level: [third_party, web, mcp_result]
+  - name: deviation
+    within: 8
+    no_prompt_between: true
+    match:
+      event_type: tool_decision
+      signals: [R-01, R-04, R-05, R-10, D-01]

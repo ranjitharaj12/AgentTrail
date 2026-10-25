@@ -5,5 +5,6 @@ points:            # added for each rule hit
   medium: 10
   low: 5
 drift_cap: 20      # event + window drift together can add at most this much
+drift_per_flag: 5  # each D-01 drift flag adds this, up to drift_cap (D-01 is not also counted as a rule hit)
 judge_cap: 30      # session judge, only when enabled
 threshold: 50      # a session is flagged when its score reaches this

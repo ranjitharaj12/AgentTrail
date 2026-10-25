@@ -2,6 +2,10 @@
 
 score = rule points + drift points (<= drift_cap) + judge points (<= judge_cap), capped at 100.
 Nothing can lower it: every input is clamped to >= 0.
+
+Status: "alert" when score >= threshold; "review" when below it but at least one drift flag (D-01)
+fired; otherwise "clear". Drift alone is capped too low to reach an alert, by design, so the review
+tier is how drift-only findings (scope drift with no rule hit) reach an analyst.
 """
 from __future__ import annotations
 
@@ -14,6 +18,7 @@ import yaml
 
 from agenttrail import store
 from agenttrail.baseline import Baseline
+from agenttrail.drift import DriftConfig, DriftResult, compute_drift
 from agenttrail.enrich import Config
 from agenttrail.rules import SEVERITIES, Hit, Rule, load_rules, run_rules
 
@@ -29,13 +34,15 @@ class Scoring:
     drift_cap: int
     judge_cap: int
     threshold: int
+    drift_per_flag: int = 5
 
     @classmethod
     def load(cls, path: Path = ROOT / "config" / "scoring.yaml") -> "Scoring":
         raw = yaml.safe_load(Path(path).read_text())
         if set(raw["points"]) != set(SEVERITIES):
             raise ValueError(f"scoring points must cover exactly {SEVERITIES}")
-        return cls(raw["points"], raw["drift_cap"], raw["judge_cap"], raw["threshold"])
+        return cls(raw["points"], raw["drift_cap"], raw["judge_cap"], raw["threshold"],
+                   raw.get("drift_per_flag", 5))
 
 
 @dataclass
@@ -51,26 +58,39 @@ class RiskScore:
     threshold: int
     contributions: list[Contribution]
     uncapped: int
+    drift_flags: int = 0
 
     @property
     def flagged(self) -> bool:
+        """An alert: the score reached the threshold."""
         return self.score >= self.threshold
+
+    @property
+    def needs_review(self) -> bool:
+        """Below the alert threshold, but behavior drifted from the user's intent."""
+        return not self.flagged and self.drift_flags > 0
+
+    @property
+    def status(self) -> str:
+        return "alert" if self.flagged else "review" if self.needs_review else "clear"
 
     def total(self, source: str) -> int:
         return sum(c.points for c in self.contributions if c.source == source)
 
 
 def score_session(hits: list[Hit], scoring: Scoring, drift_points: int = 0, judge_points: int = 0) -> RiskScore:
+    # D-xx hits are drift flags: they feed the capped drift component, not the per-rule points.
     contribs = [Contribution("rule", f"{h.rule_id} {h.severity} @ {h.event_id}", scoring.points[h.severity])
-                for h in hits]
-    drift = min(max(drift_points, 0), scoring.drift_cap)
+                for h in hits if not h.rule_id.startswith("D-")]
+    flags = sum(1 for h in hits if h.rule_id.startswith("D-"))
+    drift = min(max(drift_points, 0) + flags * scoring.drift_per_flag, scoring.drift_cap)
     judge = min(max(judge_points, 0), scoring.judge_cap)
     if drift:
-        contribs.append(Contribution("drift", "event and window drift", drift))
+        contribs.append(Contribution("drift", f"event and window drift ({flags} flagged)", drift))
     if judge:
         contribs.append(Contribution("judge", "session judge", judge))
     raw = sum(c.points for c in contribs)
-    return RiskScore(min(raw, 100), scoring.threshold, contribs, raw)
+    return RiskScore(min(raw, 100), scoring.threshold, contribs, raw, flags)
 
 
 # ---------- end-to-end analysis ----------
@@ -83,6 +103,13 @@ class Context:
     scoring: Scoring
     baseline: Baseline
     split: dict[str, list[str]]
+    drift_cfg: DriftConfig | None = None
+    embedder: object | None = None          # created on first use: loading the model takes a moment
+
+    def get_embedder(self):
+        if self.embedder is None:
+            self.embedder = self.drift_cfg.make_embedder()
+        return self.embedder
 
 
 @dataclass
@@ -94,6 +121,11 @@ class SessionResult:
     n_events: int
     hits: list[Hit]
     risk: RiskScore
+    drift: DriftResult | None = None
+
+    @property
+    def status(self) -> str:
+        return self.risk.status
 
     @property
     def top_alert(self) -> Hit | None:
@@ -102,7 +134,8 @@ class SessionResult:
 
 
 def load_context(db_path: Path = ROOT / "agenttrail.db", rules_dir: Path = ROOT / "rules",
-                 split_path: Path = ROOT / "config" / "split.yaml") -> Context:
+                 split_path: Path = ROOT / "config" / "split.yaml", use_drift: bool = True,
+                 embedder=None) -> Context:
     cfg = Config.load(ROOT / "config" / "projects.yaml")
     split = yaml.safe_load(Path(split_path).read_text())
     conn = store.connect(db_path)
@@ -112,7 +145,8 @@ def load_context(db_path: Path = ROOT / "agenttrail.db", rules_dir: Path = ROOT 
     if set(split["tuning"]) & set(split["test"]):
         raise ValueError("tuning and test sets overlap")
     baseline = Baseline.build({sid: store.get_session_events(conn, sid) for sid in split["tuning"]}, cfg)
-    return Context(cfg, load_rules(rules_dir), Scoring.load(), baseline, split)
+    return Context(cfg, load_rules(rules_dir), Scoring.load(), baseline, split,
+                   DriftConfig.load() if use_drift else None, embedder)
 
 
 def analyze_all(ctx: Context, db_path: Path = ROOT / "agenttrail.db") -> list[SessionResult]:
@@ -122,11 +156,13 @@ def analyze_all(ctx: Context, db_path: Path = ROOT / "agenttrail.db") -> list[Se
         sid = s["session_id"]
         label = conn.execute("SELECT malicious FROM labels WHERE session_id=?", (sid,)).fetchone()
         events = store.get_session_events(conn, sid)
-        hits = run_rules(events, ctx.rules, ctx.cfg.home, ctx.baseline)
+        drift = compute_drift(events, ctx.cfg, ctx.drift_cfg, ctx.get_embedder()) if ctx.drift_cfg else None
+        hits = run_rules(events, ctx.rules, ctx.cfg.home, ctx.baseline, drift)
         where = "tuning" if sid in ctx.split["tuning"] else "test" if sid in ctx.split["test"] else "attack"
         out.append(SessionResult(sid, s["project"], where, bool(label and label["malicious"]), len(events),
-                                 hits, score_session(hits, ctx.scoring)))
-    return sorted(out, key=lambda r: (-r.risk.score, r.session_id))
+                                 hits, score_session(hits, ctx.scoring), drift))
+    tier = {"alert": 2, "review": 1, "clear": 0}      # alerts first, then the review list, then the rest
+    return sorted(out, key=lambda r: (-tier[r.status], -r.risk.score, r.session_id))
 
 
 def flagged_event_ids(result: SessionResult) -> set[str]:
@@ -137,7 +173,7 @@ def flagged_event_ids(result: SessionResult) -> set[str]:
 
 
 def main(argv: list[str]) -> int:
-    p = argparse.ArgumentParser(description="Rank sessions by risk score.")
+    p = argparse.ArgumentParser(description="Rank sessions: alerts, then the needs-review list, then the rest.")
     p.add_argument("--db", type=Path, default=ROOT / "agenttrail.db")
     p.add_argument("-v", "--verbose", action="store_true", help="show each score's breakdown")
     a = p.parse_args(argv)
@@ -145,12 +181,14 @@ def main(argv: list[str]) -> int:
     ctx = load_context(a.db)
     results = analyze_all(ctx, a.db)
     print(f"threshold {ctx.scoring.threshold}; baseline from {len(ctx.split['tuning'])} tuning sessions\n")
-    print(f"{'session':9} {'set':7} {'score':>5}  {'':7} {'truth':9} top alert")
+    counts = {k: sum(r.status == k for r in results) for k in ("alert", "review", "clear")}
+    print(f"{counts['alert']} alert, {counts['review']} needs review, {counts['clear']} clear\n")
+    print(f"{'session':9} {'set':7} {'score':>5}  {'status':7} {'truth':9} top alert")
     for r in results:
         top = r.top_alert
         top_s = f"{top.rule_id} {top.severity} - {top.title}" if top else ""
-        flag = "FLAGGED" if r.risk.flagged else ""
-        print(f"{r.session_id:9} {r.split:7} {r.risk.score:>5}  {flag:7} {'malicious' if r.malicious else 'benign':9} {top_s}")
+        status = {"alert": "ALERT", "review": "REVIEW", "clear": ""}[r.status]
+        print(f"{r.session_id:9} {r.split:7} {r.risk.score:>5}  {status:7} {'malicious' if r.malicious else 'benign':9} {top_s}")
         if a.verbose and r.risk.contributions:
             for c in r.risk.contributions:
                 print(f"{'':27}+{c.points:<3} {c.label}")

@@ -6,4 +6,5 @@ atlas: [AML.T0086]          # provisional: verify against atlas.mitre.org
 match:
   event_type: tool_decision
   decision: accept
+  action_type: network
   domain_new: true

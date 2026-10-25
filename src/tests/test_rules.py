@@ -31,7 +31,7 @@ def rule_ids(hits):
 
 def test_all_rules_load_and_have_unique_ids():
     assert {r.id for r in RULES} == {"R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07",
-                                     "R-09", "R-10", "R-11", "R-12"}
+                                     "R-08", "R-09", "R-10", "R-11", "R-12"}
 
 
 def test_every_rule_has_an_atlas_mapping():

@@ -1,0 +1,23 @@
+# Intent-drift scoring (PRD FR-6). Scores are cosine DISTANCE between embeddings
+# (0 = same meaning, higher = further apart). With bge-small, on-intent actions
+# land around 0.2 and unrelated ones around 0.45, so thresholds are small numbers.
+# Thresholds come from `python -m agenttrail.drift --calibrate`: the highest benign TUNING score
+# plus a 0.01 margin. Test and attack sessions are never used. Re-run it if fixtures change.
+model: BAAI/bge-small-en-v1.5
+cache_dir: .cache/fastembed          # relative to src/
+window_size: 4                       # events per window (PRD: 3-5)
+event_threshold: 0.408               # a single event this far from intent is a spike
+window_threshold: 0.404              # a window of 3-5 events this far from intent
+run_threshold: 0.39                  # run_length events in a row above this
+run_length: 3
+severity: medium                     # D-01
+atlas: [AML.T0053]                   # provisional: verify against atlas.mitre.org
+# Commands too ordinary to be worth scoring. Every `&&` part must match, and no pipes,
+# redirects, `;` or substitutions are allowed, so a routine command can't smuggle a bad one.
+routine_commands:
+  - '^(python\s+-m\s+)?pytest\b'
+  - '^(ruff|mypy|flake8|black|isort)\b'
+  - '^(ls|pwd)\b'
+  - '^git\s+(status|diff|log|add|commit|stash|branch)\b'
+  - '^pip\s+install\s+-r\s+\S+$'
+  - '^python\s+-m\s+build\b'
