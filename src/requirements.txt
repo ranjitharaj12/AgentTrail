@@ -1,0 +1,8 @@
+# Python 3.12 is required for the drift layer: fastembed's runtime (onnxruntime) has no build for 3.15 yet.
+# Direct dependencies, pinned to the versions the evaluation numbers were produced with.
+pydantic==2.14.1       # event schema and validation
+pyyaml==6.0.3          # rule files and config
+fastembed==0.9.1       # local embedding model for intent drift (no API key)
+anthropic==2.3.0       # only needed for the Claude explainer
+streamlit==1.66.1      # the two-view UI
+pytest==9.1.1          # the test suite

@@ -195,3 +195,23 @@ def test_a_missing_database_gives_instructions_not_a_crash(env, monkeypatch, tmp
     monkeypatch.setenv("AGENTTRAIL_DRIFT", "0")
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60).run()
     assert not at.exception and at.error and "agenttrail.load" in at.code[0].value
+
+
+def test_a_link_with_a_session_opens_it_directly(env, monkeypatch):
+    monkeypatch.setenv("AGENTTRAIL_DB", str(env[0]))
+    monkeypatch.setenv("AGENTTRAIL_NARRATIVES", str(env[1]))
+    monkeypatch.setenv("AGENTTRAIL_DRIFT", "0")
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120)
+    at.query_params["session"] = "s-a01"
+    at.run()
+    assert not at.exception and at.header[0].value.startswith("s-a01")
+
+
+def test_a_link_to_a_session_that_does_not_exist_warns_instead_of_crashing(env, monkeypatch):
+    monkeypatch.setenv("AGENTTRAIL_DB", str(env[0]))
+    monkeypatch.setenv("AGENTTRAIL_NARRATIVES", str(env[1]))
+    monkeypatch.setenv("AGENTTRAIL_DRIFT", "0")
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120)
+    at.query_params["session"] = "s-nope'; drop table events;--"
+    at.run()
+    assert not at.exception and at.warning and "no session called" in at.warning[0].value

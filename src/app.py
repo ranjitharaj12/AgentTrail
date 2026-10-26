@@ -57,6 +57,11 @@ def style_rows(df: pd.DataFrame, column: str):
 
 st.session_state.setdefault("view", "Sessions")
 st.session_state.setdefault("sid", None)
+if "from_url" not in st.session_state:                         # a link like ?session=s-x01 opens that session directly
+    st.session_state.from_url = True
+    if st.query_params.get("session"):
+        st.session_state.sid = st.query_params["session"]
+        st.session_state.view = "Session"
 
 with st.sidebar:
     st.title("AgentTrail")
@@ -108,6 +113,9 @@ else:
     sid = st.session_state.sid
     if not sid:
         st.info("Pick a session on the Sessions view first.")
+        st.stop()
+    if sid not in {x.session_id for x in world.results}:
+        st.warning(f"There is no session called {sid!r}. Pick one from the Sessions view.")
         st.stop()
     r = world.result(sid)
     st.button("← All sessions", on_click=lambda: st.session_state.update(view="Sessions"))
