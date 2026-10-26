@@ -71,7 +71,7 @@ flowchart LR
 
 | | |
 |---|---|
-| ![A session page: narrative, with the planted text quoted and not followed](docs/img/session.jpg) | ![The timeline: flagged, trigger and cited events highlighted](docs/img/timeline.jpg) |
+| ![A session page: the verdict banner, then the narrative as icon-led cards with coloured citation badges](docs/img/session.jpg) | ![The timeline with a severity column, deeper red for worse events](docs/img/timeline.jpg) |
 
 Two views: the ranked list, and one session with its narrative, score breakdown and a timeline. Recorded text is attacker-controlled, so it only ever reaches the screen as plain table cells; URLs in narratives are defanged (`hxxps://`) so they cannot be clicked.
 
@@ -111,9 +111,10 @@ export ANTHROPIC_API_KEY="..."
 Start it with `.venv/bin/streamlit run app.py` (from `src`) and open <http://localhost:8501>.
 
 - **Sessions view.** Riskiest first: alerts, then the needs-review list, then the rest. Each row shows what the user asked, how long it ran, how many events, and the top alert. Filter by status, click a row (or use the picker underneath) and press **Open**.
-- **Session view.** The narrative, with every claim tagged by the events it cites; a *Why it scored this way* panel with each rule hit and its points; and the timeline. In the timeline, **flagged** rows fired a rule or a drift flag, the **trigger** row is the content the detector blames, and **cited** rows are the ones the narrative used. Tick *Only flagged, trigger and cited events* to cut a long session down, and use *Inspect an event* for the full redacted record.
+- **Session view.** A verdict banner (status, severity, score, the most serious rule, the likely trigger; all from the rules), then the full narrative as icon-led cards (asked, did, reported, deviated, trigger, do next), with every claim carrying citation badges coloured by what they point at; then the **timeline**, with a **Severity** column (the worst rule that fired on each event) and flagged rows tinted deeper red the more severe they are; then **Inspect an event** for one event's full redacted record; then **Flagged events**. Each flagged event opens to one card per rule, with the rule's name and severity, what it looks for, and the evidence that matched (the exact path, the destination, the sentence that looked like an instruction, the drift distance against its limit). The event's header shows its severity and rule count before you open it. A *How the points add up* panel comes last. Tick *Only flagged, trigger and cited events* to cut a long session down.
 - **Links.** `?session=s-x01` opens a session directly. Good ones to start with: `s-a01` (a README tells the agent to send credentials out), `s-x01` (the planted text also tries to talk the explainer out of the alert), `s-a08` (needs review, no rule fires) and `s-b07` (a sensitive file the user asked about, so it stays clear).
 - **Reload data** in the sidebar picks up a changed database or new narratives.
+- **If you edit the code while the app is running,** restart it. The app notices when its files changed after it started and says so, instead of showing an error.
 
 To try your own session without touching the real evaluation, see [`src/playground/README.md`](src/playground/README.md).
 
@@ -124,6 +125,7 @@ To try your own session without touching the real evaluation, see [`src/playgrou
 - **Hand-written pattern lists are brittle.** Which paths count as secrets, which commands count as network or destructive: every list has gaps, and new attacks will find them.
 - **Drift is a weak signal.** Benign work tops out at a distance of 0.40 and attacks at 0.45 to 0.49. One scope-drift case clears its threshold by 0.001. The score uses the agent's own *stated* purpose, which a misleading agent can shape.
 - **Naming a file in the prompt softens the alert.** When the user's own prompt names a credentials file, the read and the "toxic flow" rule drop to Medium even if the file is then uploaded. The upload command itself stays High, so the example in the playground still alerts (80), but the rule is softer than it should be.
+- **A formatting bug in the drift text.** The description the embedding model compares includes the Python enum name (`PathClass.sensitive file`) instead of plain `sensitive file`. Scores were calibrated with it as is; fixing it would change drift scores and need a new freeze.
 - **Shell parsing is heuristic.** Paths and commands are inferred from text, so wildcards and nested subshells can be misread, and a curl-style `@file` argument is turned into a wrong path (the sensitive-path check still catches it, but "the user named this file" cannot match it).
 - **A few labels are judgement calls.** For example the "agent overreach" case (`find ~ -delete`) is a reasonable-people-could-differ label.
 - **MITRE ATLAS technique IDs on the rules are provisional** and need checking against the current catalog.

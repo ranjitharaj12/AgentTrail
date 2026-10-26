@@ -40,13 +40,21 @@ class World:
         return r.split
 
 
+def stale_modules(started_at: float, package_dir: Path = ROOT / "agenttrail") -> list[str]:
+    """Files of the package edited after this server started. Streamlit reloads the page script when it
+    changes but not the modules it imports, so a long-running server can end up with new page code over old
+    data code. Better to say so than to crash with a traceback."""
+    return sorted(f.name for f in Path(package_dir).glob("*.py") if f.stat().st_mtime > started_at)
+
+
 def load_world(db: Path, narratives_dir: Path = ROOT / "reports" / "narratives", use_drift: bool = True,
-               embedder=None) -> World:
+               embedder=None, base_narratives: Path | None = None) -> World:
     ctx = load_context(db, use_drift=use_drift, embedder=embedder)
     results = tag_explainer_sessions(analyze_all(ctx, db), ctx)
     conn = store.connect(db)
     events = {r.session_id: store.get_session_events(conn, r.session_id) for r in results}
-    narratives = {n["session_id"]: n for n in load_narratives(narratives_dir)}
+    narratives = {n["session_id"]: n for n in load_narratives(base_narratives)} if base_narratives else {}
+    narratives.update({n["session_id"]: n for n in load_narratives(narratives_dir)})      # yours win over the base
     return World(db, ctx, results, events, narratives)
 
 
@@ -96,6 +104,11 @@ def trigger_events(result: SessionResult) -> set[str]:
     return {x for h in result.hits if h.rule_id in SOURCE_RULES for x in h.related}
 
 
+def top_severity(hits: list) -> str:
+    """The most severe of a set of hits, or "" when there are none."""
+    return max((h.severity for h in hits), key=SEV_ORDER.index, default="")
+
+
 def timeline(world: World, sid: str) -> list[dict]:
     r = world.result(sid)
     flags: dict[str, list[str]] = {}
@@ -115,6 +128,7 @@ def timeline(world: World, sid: str) -> list[dict]:
         rows.append({
             "Seq": e.seq, "Event": e.event_id, "Time": e.ts[11:19], "Type": str(getattr(e.event_type, "value", e.event_type)),
             "Who": str(getattr(e.actor, "value", e.actor)), "What happened": summarize(e),
+            "Severity": top_severity([h for h in r.hits if h.event_id == e.event_id]).capitalize(),
             "Rules": ", ".join(sorted(set(flags.get(e.event_id, [])))),
             "Drift": round(drift[e.event_id], 3) if e.event_id in drift else None,
             "Marks": " + ".join(marks),
@@ -158,6 +172,45 @@ def narrative_sections(world: World, sid: str) -> list[tuple[str, list[dict]]]:
         return []
     return [(HEADINGS[s], [c for c in n["claims"] if c["section"] == s]) for s in SECTIONS
             if any(c["section"] == s for c in n["claims"])]
+
+
+TRUST_PHRASE = {"third_party": "vendored or third-party content", "web": "web content", "mcp_result": "an MCP tool result",
+                "user_authored": "the user's own file"}
+
+
+def headline(world: World, sid: str) -> dict:
+    """The facts for the banner at the top of a session: all from the detector, none from the narrator."""
+    r = world.result(sid)
+    hits = sorted(r.hits, key=lambda h: (-SEV_ORDER.index(h.severity), h.seq, h.rule_id))
+    top = hits[0] if hits else None
+    src = next((x for h in sorted(r.hits, key=lambda h: h.seq) if h.rule_id in SOURCE_RULES for x in h.related[:1]), None)
+    by_id = {e.event_id: e for e in world.events[sid]}
+    trust = getattr(by_id[src].trust_level, "value", by_id[src].trust_level) if src else None
+    return {
+        "status": r.status, "score": r.risk.score, "threshold": r.risk.threshold,
+        "severity": top.severity if top else "",
+        "flagged_events": len({h.event_id for h in r.hits}), "rules": sorted({h.rule_id for h in r.hits}),
+        "top": {"rule_id": top.rule_id, "title": top.title, "event_id": top.event_id} if top else None,
+        "trigger": {"event_id": src, "trust": trust, "phrase": TRUST_PHRASE.get(trust, "low-trust content")} if src else None,
+    }
+
+
+def cite_kinds(world: World, sid: str) -> dict[str, str]:
+    """What each event is, for colouring a citation: its worst severity if flagged, 'trigger', or 'plain'."""
+    r = world.result(sid)
+    kinds = {e.event_id: "plain" for e in world.events[sid]}
+    for h in r.hits:
+        kinds[h.event_id] = top_severity([x for x in r.hits if x.event_id == h.event_id])
+    for eid in trigger_events(r):
+        if kinds.get(eid) == "plain":
+            kinds[eid] = "trigger"
+    return kinds
+
+
+def narrative_by_section(world: World, sid: str) -> dict[str, list[dict]]:
+    n = world.narratives.get(sid)
+    return {sec: [c for c in n["claims"] if c["section"] == sec] for sec in SECTIONS
+            if n and any(c["section"] == sec for c in n["claims"])}
 
 
 def narrative_source(world: World, sid: str) -> str | None:

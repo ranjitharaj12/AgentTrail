@@ -24,7 +24,7 @@ AGENTTRAIL_DB=playground/playground.db AGENTTRAIL_NARRATIVES=playground/narrativ
   .venv/bin/streamlit run app.py --server.port 8502
 ```
 
-Then open <http://localhost:8502/?session=s-p01>. Your session is labelled **yours** in the Set column. After you change the script, re-run steps 1 to 4 and press **Reload data** in the sidebar.
+Then open <http://localhost:8502/?session=s-p01>. Your session is labelled **yours** in the Set column. The 28 real sessions keep their narratives here too: narratives you generate into `playground/narratives` are layered on top of the real ones. After you change the script, re-run steps 1 to 4 and press **Reload data** in the sidebar.
 
 ## Things to try
 
