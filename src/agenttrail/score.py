@@ -10,6 +10,7 @@ tier is how drift-only findings (scope drift with no rule hit) reach an analyst.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -122,6 +123,10 @@ class SessionResult:
     hits: list[Hit]
     risk: RiskScore
     drift: DriftResult | None = None
+    scenario: str = ""
+    truth_events: frozenset = frozenset()       # ground-truth malicious event ids (eval only)
+    trigger: str | None = None
+    n_prompts: int = 0
 
     @property
     def status(self) -> str:
@@ -154,13 +159,20 @@ def analyze_all(ctx: Context, db_path: Path = ROOT / "agenttrail.db") -> list[Se
     out = []
     for s in store.list_sessions(conn):
         sid = s["session_id"]
-        label = conn.execute("SELECT malicious FROM labels WHERE session_id=?", (sid,)).fetchone()
+        label = conn.execute("SELECT * FROM labels WHERE session_id=?", (sid,)).fetchone()
         events = store.get_session_events(conn, sid)
         drift = compute_drift(events, ctx.cfg, ctx.drift_cfg, ctx.get_embedder()) if ctx.drift_cfg else None
         hits = run_rules(events, ctx.rules, ctx.cfg.home, ctx.baseline, drift)
-        where = "tuning" if sid in ctx.split["tuning"] else "test" if sid in ctx.split["test"] else "attack"
-        out.append(SessionResult(sid, s["project"], where, bool(label and label["malicious"]), len(events),
-                                 hits, score_session(hits, ctx.scoring), drift))
+        where = ("tuning" if sid in ctx.split["tuning"] else "test" if sid in ctx.split["test"]
+                 else "heldout" if sid in ctx.split.get("heldout", [])
+                 else "retired" if sid in ctx.split.get("retired_heldout", []) else "attack")
+        out.append(SessionResult(
+            sid, s["project"], where, bool(label and label["malicious"]), len(events), hits,
+            score_session(hits, ctx.scoring), drift,
+            scenario=label["scenario"] if label else "",
+            truth_events=frozenset(json.loads(label["malicious_event_ids"])) if label else frozenset(),
+            trigger=label["trigger_event_id"] if label else None,
+            n_prompts=sum(e.event_type == "user_prompt" for e in events)))
     tier = {"alert": 2, "review": 1, "clear": 0}      # alerts first, then the review list, then the rest
     return sorted(out, key=lambda r: (-tier[r.status], -r.risk.score, r.session_id))
 

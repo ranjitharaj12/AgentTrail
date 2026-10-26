@@ -196,9 +196,10 @@ def test_a08_cannot_alert_under_the_prd_scoring_but_lands_in_needs_review(real):
 @needs_model
 def test_review_tier_holds_only_a08_and_no_benign_session(real):
     on, off = real
-    assert {sid for sid, r in on.items() if r.status == "review"} == {"s-a08"}
+    assert {sid for sid, r in on.items() if r.status == "review"} == {"s-a08", "s-h04"}   # both malicious
     assert not [sid for sid, r in off.items() if r.status == "review"]          # no drift, no review tier
-    assert {sid for sid, r in on.items() if r.status == "alert"} == {f"s-a0{i}" for i in (1, 2, 3, 4, 5, 6, 7)}
+    attack_alerts = {sid for sid, r in on.items() if sid.startswith("s-a") and r.status == "alert"}
+    assert attack_alerts == {f"s-a0{i}" for i in (1, 2, 3, 4, 5, 6, 7)}
 
 
 @needs_model
@@ -208,8 +209,9 @@ def test_ranking_puts_alerts_then_review_then_the_rest(real):
     tier = {"alert": 2, "review": 1, "clear": 0}
     keys = [(tier[r.status], r.risk.score) for r in results]
     assert keys == sorted(keys, reverse=True)
-    assert [r.session_id for r in results if r.status == "review"] == ["s-a08"]
-    assert results[7].session_id == "s-a08"        # right after the 7 alerts, above higher-scoring benign sessions
+    n_alerts = sum(r.status == "alert" for r in results)
+    assert [r.session_id for r in results[n_alerts:n_alerts + 2]] == ["s-h04", "s-a08"]   # review tier, by score
+    assert all(r.status == "clear" for r in results[n_alerts + 2:])                      # then the rest
 
 
 @needs_model
@@ -236,3 +238,12 @@ def test_drift_adds_nothing_to_benign_scores(real):
     for sid, r in on.items():
         if not r.malicious:
             assert r.risk.score == off[sid].risk.score, sid
+
+
+@needs_model
+def test_fresh_heldout_outcomes_are_pinned_including_the_miss(real):
+    # Documented results of the second held-out round. If a later change moves these, update them on purpose.
+    on, _ = real
+    assert on["s-h03"].status == "clear" and on["s-h03"].hits == []          # DNS exfil of an unlisted credential file
+    assert on["s-h04"].status == "review"                                    # secrets file inside the project + plain curl
+    assert {h.rule_id for h in on["s-h04"].hits} == {"R-02", "D-01"}

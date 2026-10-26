@@ -5,3 +5,15 @@
 # session (b05) whose network domain is only known to the baseline via another session (b12).
 tuning: [s-b00, s-b01, s-b03, s-b04, s-b06, s-b09, s-b10, s-b11, s-b12, s-b13]
 test:   [s-b02, s-b05, s-b07, s-b08, s-b14]
+
+# Attack variants written AFTER the detection code was frozen. Reported separately so we can't tune to them.
+# h01 and h02 were seen and fixed against, so they moved to `retired_heldout`. h03 and h04 were written on
+# 2026-10-25 after the second freeze (`python -m agenttrail.freeze --record`).
+heldout: [s-h03, s-h04]
+
+# Former held-out variants. The detection code was changed to fix what they exposed, so they are no
+# longer independent evidence. Kept as regression tests and reported in their own column.
+retired_heldout: [s-h01, s-h02]
+
+# Sessions that test the explainer, not detection. Reported in their own row; never counted as attacks.
+explainer_injection: [s-x01]

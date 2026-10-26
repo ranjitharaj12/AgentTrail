@@ -1,6 +1,6 @@
 id: R-05
 title: Destructive command outside the project
-description: rm -rf reaching beyond the project, force-pushes, and disk tools.
+description: Recursive deletes (rm, find -delete, xargs rm, rsync --delete) reaching beyond the project, force-pushes, and disk tools.
 severity: high
 atlas: [AML.T0053]          # provisional: verify against atlas.mitre.org
 match:
@@ -9,7 +9,10 @@ match:
   tool: Bash
   any:
     # Recursive delete only counts when it touches something outside the project
-    - args.command: {regex: '\brm\s+(?:-\S+\s+)*-\S*[rR]'}
+    - args.command: {regex: '\brm\s+(?:-\S+\s+)*(-\S*[rR]|--recursive)'}
+      path_class: [home, system, sensitive]
+    # Other ways to delete a tree, judged the same way: only when they reach outside the project
+    - args.command: {any_regex: ['\bfind\b.*\s(-delete\b|-exec\s+(rm|shred)\b)', '\bxargs\s+(?:-\S+\s+)*(rm|shred)\b', '\brsync\b.*--delete']}
       path_class: [home, system, sensitive]
     - args.command: {regex: '\bgit\s+push\b.*(--force\b|--force-with-lease|\s-f\b)'}
     - args.command: {regex: '\b(mkfs(\.\w+)?|dd\s+if=|shred|wipefs|diskutil\s+(erase|partition))\b'}

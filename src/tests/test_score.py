@@ -157,7 +157,7 @@ def test_test_session_with_a_known_domain_is_not_flagged_by_r02(results):
 
 def test_seven_of_eight_attacks_are_flagged_by_rules_alone_and_a08_is_not(results):
     _, res, _ = results
-    attacks = {sid: r for sid, r in res.items() if r.split == "attack"}
+    attacks = {sid: r for sid, r in res.items() if sid.startswith("s-a")}     # the eight scenarios, by id
     assert len(attacks) == 8
     assert {sid for sid, r in attacks.items() if r.risk.flagged} == {f"s-a0{i}" for i in (1, 2, 3, 4, 5, 6, 7)}
     assert res["s-a08"].risk.score == 0

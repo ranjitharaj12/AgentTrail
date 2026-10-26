@@ -1,0 +1,123 @@
+{
+  "reviewer": "claude",
+  "sampled": 12,
+  "supported": 11,
+  "partly": 1,
+  "not_supported": 0,
+  "all_items": [
+    {
+      "n": 1,
+      "session": "s-a03",
+      "claim_index": 7,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 2,
+      "session": "s-a01",
+      "claim_index": 7,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 3,
+      "session": "s-a01",
+      "claim_index": 5,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 4,
+      "session": "s-a05",
+      "claim_index": 7,
+      "verdict": "P",
+      "random": true
+    },
+    {
+      "n": 5,
+      "session": "s-a04",
+      "claim_index": 1,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 6,
+      "session": "s-h02",
+      "claim_index": 6,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 7,
+      "session": "s-x01",
+      "claim_index": 3,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 8,
+      "session": "s-a04",
+      "claim_index": 3,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 9,
+      "session": "s-a06",
+      "claim_index": 3,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 10,
+      "session": "s-a05",
+      "claim_index": 3,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 11,
+      "session": "s-a07",
+      "claim_index": 6,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 12,
+      "session": "s-a05",
+      "claim_index": 8,
+      "verdict": "Y",
+      "random": true
+    },
+    {
+      "n": 13,
+      "session": "s-a07",
+      "claim_index": 7,
+      "verdict": "P",
+      "random": false
+    },
+    {
+      "n": 14,
+      "session": "s-h02",
+      "claim_index": 7,
+      "verdict": "P",
+      "random": false
+    }
+  ],
+  "flagged_items_not_counted": [
+    {
+      "n": 13,
+      "session": "s-a07",
+      "claim_index": 7,
+      "verdict": "P",
+      "random": false
+    },
+    {
+      "n": 14,
+      "session": "s-h02",
+      "claim_index": 7,
+      "verdict": "P",
+      "random": false
+    }
+  ]
+}

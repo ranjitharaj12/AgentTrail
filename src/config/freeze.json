@@ -1,0 +1,28 @@
+{
+  "frozen_on": "2026-10-25",
+  "note": "Second freeze: after broadening secret paths, network tools, delete forms and R-07 wording to fix the first held-out misses (h01, h02)",
+  "digest": "53d9c7f546f397c26f0cd2b26732d60fb05bd90a6c4d5a67e85181f019639c94",
+  "files": {
+    "rules/R-01_sensitive_read.yaml": "3bbe68911da2b9df503b5f52c5f3fd73ace8aee8888413dcb238c05bd5b63859",
+    "rules/R-02_new_egress_domain.yaml": "38681504d2f01014fcc82793f970121d59076a36eedfa1b76936665e2ac8a119",
+    "rules/R-03_toxic_flow.yaml": "b3dd5e04c8bcdbc6022821407a61e9751f8891af25a87c5c06e64e00066da0cc",
+    "rules/R-04_persistence.yaml": "7590358eb6b0bf4c3b3d7da69ada2761eba0e9c39c14c975d1582ef1135893a1",
+    "rules/R-05_destructive.yaml": "e6c6572d79d18f31489ec4d607d2517e2a72eb5d435ce764f032aaac02b863d3",
+    "rules/R-06_encode_before_egress.yaml": "d001c4242180cd3cf7d7c894c8993372af74d7f1165a262b51c68abc228e457d",
+    "rules/R-07_instruction_in_untrusted_content.yaml": "ebdc2ea54ab7c7ac9b82aba3a6dc99b409dc2c12d7346777a5e79026b3700bf5",
+    "rules/R-08_unprompted_course_change.yaml": "f13d65439d429c16bc6a278981f6049b45dbf6b84f7e8337ee8e450c5054078e",
+    "rules/R-09_cross_server_mcp.yaml": "4cf0325f18ace230a29c6b05ae39faf9125998041944905d1d622f1532e7af6e",
+    "rules/R-10_blocked_attempt.yaml": "b5811242a21e724e500acef5d9b109035507ccaae2145451acfc812ac44c0964",
+    "rules/R-11_environment_change.yaml": "73a7fa360a040a9c79c7d610d623e8569a4ef5361ce00c8e42ee28c20ddb5af7",
+    "rules/R-12_unreported_action.yaml": "95d8ecbd4266cc264f90dca9204131e49ac87c22d43ce5d87725a04fb678707f",
+    "config/projects.yaml": "e61abcb0b8e6be94fa50488aea64fbb2bdd2af5bd9157e7ea669513370c669c7",
+    "config/drift.yaml": "fc27f3cc8d157d606c92f7d23dd5c604df410c8674771f89541a33b797273147",
+    "config/scoring.yaml": "5d305207120a5209256cd08787b811ccbbff325741b033d34e2eb9137d6188f4",
+    "agenttrail/enrich.py": "3887a86e9d39b4050a451026da54fd6974af64a572abdcfab8899c382a34080d",
+    "agenttrail/rules.py": "3829f658b70605409f30841158123a774314edcab78c8ad94e9b3fb21dabf433",
+    "agenttrail/drift.py": "ae8923c2f9edd9b59f8796dc72e1c176179ddc0b9fdc31673a7112d5bb76667b",
+    "agenttrail/baseline.py": "cfa5d917aa8826463679bff10f1a8758ae17e471d7f7016b1207fe885ee169f8",
+    "agenttrail/score.py": "0573d00077c0b9a2f663c967285640918baf4b0d2ffbc2e64d854397acb740a3",
+    "agenttrail/schema.py": "389b9f3a75dd848a5f6abaa856b94be6f2eaa8010fbf21aae54073e09cce751f"
+  }
+}

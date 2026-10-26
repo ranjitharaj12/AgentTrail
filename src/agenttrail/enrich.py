@@ -46,7 +46,15 @@ SENSITIVE = [re.compile(p) for p in [
     r"/Library/Keychains", r"/\.config/(google-chrome|chromium|BraveSoftware)",
     r"/Library/Application Support/(Google/Chrome|Firefox)",
     r"(^|/)\.(bash|zsh)_history$", r"(^|/)\.netrc$", r"(^|/)\.git-credentials$",
+    # Credential stores of common command-line tools (an auth token lives in each)
+    r"/\.config/(gh|hub|gcloud|op|rclone|heroku)(/|$)", r"/\.docker/config\.json$",
+    r"/\.(azure|oci)(/|$)", r"/\.terraform\.d/credentials", r"/\.m2/settings\.xml$",
+    r"(^|/)\.(pypirc|npmrc|vault-token|s3cfg|terraformrc)$",
 ]]
+# Outside the project, a data file whose name says it holds a secret is treated as one.
+# (Inside the project the name alone is too weak: `token_utils.json` is probably just code data.)
+SECRET_NAME = re.compile(r"(?i)(^|/)[^/]*(credential|secret|token|api[-_]?key|passwd|password)[^/]*"
+                         r"\.(json|ya?ml|toml|ini|cfg|conf|env|txt|key)$")
 
 PATH_ARG_KEYS = ("file_path", "path", "notebook_path")
 SEVERITY = {PathClass.project: 0, PathClass.home: 1, PathClass.system: 2, PathClass.sensitive: 3}
@@ -98,9 +106,10 @@ def _drop_sed_scripts(toks: list[str]) -> list[str]:
 
 
 def classify_path(p: str, root: str, home: str) -> PathClass:
-    if any(s.search(p) for s in SENSITIVE):
+    inside = p == root or p.startswith(root + "/")
+    if any(s.search(p) for s in SENSITIVE) or (not inside and SECRET_NAME.search(p)):
         return PathClass.sensitive
-    if p == root or p.startswith(root + "/"):
+    if inside:
         return PathClass.project
     if p == home or p.startswith(home + "/"):
         return PathClass.home
@@ -110,7 +119,11 @@ def classify_path(p: str, root: str, home: str) -> PathClass:
 # ---------- network ----------
 
 URL_RE = re.compile(r"https?://[^\s'\"<>]+")
-NET_BINARIES = {"curl", "wget", "nc", "ncat", "scp", "sftp", "rsync", "ssh"}
+NET_BINARIES = {"curl", "wget", "nc", "ncat", "netcat", "socat", "telnet", "ftp", "sftp", "scp", "rsync", "ssh",
+                "gh", "hub", "aws", "gcloud", "az", "kubectl", "twine", "http", "https", "xh", "aria2c"}
+# Programs that are local for most subcommands and remote for a few.
+NET_SUBCOMMANDS = {"git": {"push", "fetch", "pull", "clone", "ls-remote"},
+                   "docker": {"push", "pull", "login"}, "npm": {"publish", "login", "adduser"}}
 # Commands that only print or filter text: a URL inside them is just text, not a request.
 TEXT_BINARIES = {"echo", "printf", "cat", "grep", "rg", "sed", "awk", "head", "tail", "less", "wc", "tee"}
 
@@ -134,16 +147,56 @@ WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 NET_TOOLS = {"WebFetch", "WebSearch"}
 
 
-def command_binary(cmd: str) -> str | None:
+SEPARATORS = {"&&", "||", ";", "|", "&", "(", ")"}
+PREFIXES = {"sudo", "env", "nohup", "time", "command", "exec"}
+
+
+def command_segments(cmd: str) -> list[list[str]]:
+    """Split a shell command into simple commands at &&, ||, ;, | and subshell parentheses."""
     try:
-        toks = shlex.split(cmd)
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
     except ValueError:
         toks = cmd.split()
-    for t in toks:                       # skip VAR=value prefixes and sudo
-        if ("=" in t and not t.startswith("-")) or t == "sudo":
+    segs, cur = [], []
+    for t in toks:
+        if t in SEPARATORS:
+            if cur:
+                segs.append(cur)
+            cur = []
+        else:
+            cur.append(t)
+    if cur:
+        segs.append(cur)
+    return segs
+
+
+def _program(seg: list[str]) -> tuple[str | None, list[str]]:
+    """The program a simple command runs, and its arguments, past VAR=value and sudo-style prefixes."""
+    for i, t in enumerate(seg):
+        if ("=" in t and not t.startswith("-")) or t in PREFIXES:
             continue
-        return posixpath.basename(t)
-    return None
+        return posixpath.basename(t), seg[i + 1:]
+    return None, []
+
+
+def command_programs(cmd: str) -> list[tuple[str, list[str]]]:
+    return [(b, a) for b, a in map(_program, command_segments(cmd)) if b]
+
+
+def command_binary(cmd: str) -> str | None:
+    """The first program a command runs."""
+    progs = command_programs(cmd)
+    return progs[0][0] if progs else None
+
+
+def _is_network(prog: str, args: list[str]) -> bool:
+    return prog in NET_BINARIES or bool(set(args[:4]) & NET_SUBCOMMANDS.get(prog, set()))
+
+
+DELETE_BINARIES = {"rm", "rmdir", "shred", "unlink", "dd", "mkfs"}
+FIND_DELETE = re.compile(r"\bfind\b.*\s(-delete\b|-exec\s+(rm|shred)\b)")
 
 
 def action_type(ev: Event, net_dest: str | None) -> str | None:
@@ -160,10 +213,12 @@ def action_type(ev: Event, net_dest: str | None) -> str | None:
     if ev.tool in NET_TOOLS:
         return "network"
     if ev.tool == "Bash":
-        binary = command_binary(str(ev.args.get("command", ""))) or ""
-        if binary in NET_BINARIES or (net_dest and binary not in TEXT_BINARIES):
+        cmd = str(ev.args.get("command", ""))
+        progs = command_programs(cmd)
+        names = [b for b, _ in progs]
+        if any(_is_network(b, a) for b, a in progs) or (net_dest and any(b not in TEXT_BINARIES for b in names)):
             return "network"
-        if binary in {"rm", "rmdir", "shred", "dd", "mkfs"}:
+        if any(b in DELETE_BINARIES for b in names) or FIND_DELETE.search(cmd):
             return "delete"
         return "exec"
     return "other"

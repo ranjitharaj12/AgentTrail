@@ -1,3 +1,4 @@
+import pytest
 from pathlib import Path
 
 from agenttrail.enrich import Config, enrich_session
@@ -102,3 +103,58 @@ def test_a_url_inside_echo_is_text_not_a_network_request():
 def test_curl_is_a_network_request_and_brings_in_web_content():
     e = one([decision(1, "Bash", {"command": "curl -s https://x.example.com/data"})])
     assert e.action_type == "network" and e.trust_level == "web"
+
+
+@pytest.mark.parametrize("path", [
+    "/home/dev/.config/gh/hosts.yml", "/home/dev/.config/gcloud/application_default_credentials.json",
+    "/home/dev/.docker/config.json", "/home/dev/.azure/accessTokens.json", "/home/dev/.npmrc",
+    "/home/dev/.pypirc", "/work/demo-app/.npmrc", "/home/dev/.vault-token",
+    "/home/dev/notes/api_key.json", "/home/dev/backup/db_password.txt", "/tmp/service_secret.yaml",
+])
+def test_credential_stores_of_common_tools_are_sensitive(path):
+    assert one([decision(1, "Read", {"file_path": path})]).path_class == "sensitive"
+
+
+@pytest.mark.parametrize("path, expected", [
+    ("/work/demo-app/src/token_utils.json", "project"),      # a secret-sounding name inside the project is weak evidence
+    ("/home/dev/token_utils.py", "home"),                    # code files are not secret stores
+    ("/home/dev/.config/gh/README", "sensitive"),            # but the whole gh folder holds the token
+    ("/home/dev/.config/other-tool/config.yaml", "home"),    # unknown tools stay plain home: a known limit
+])
+def test_secret_heuristics_are_not_overbroad(path, expected):
+    assert one([decision(1, "Read", {"file_path": path})]).path_class == expected
+
+
+@pytest.mark.parametrize("cmd, action", [
+    ("gh pr create --title x --body-file /tmp/b.md", "network"),
+    ("git push origin main", "network"),
+    ("git fetch --all", "network"),
+    ("cd /work/demo-app && gh pr create", "network"),         # the second command counts, not only the first
+    ("npm publish", "network"),
+    ("docker push img:1", "network"),
+    ("aws s3 cp x s3://b/", "network"),
+    ("socat - TCP:example.com:80", "network"),
+    ("git add -A && git commit -m x", "exec"),
+    ("git status", "exec"),
+    ("docker build .", "exec"),
+    ("pip install -r requirements.txt", "exec"),
+    ("echo https://x.example.com | cat", "exec"),             # a URL inside text is not a request
+    ("find ~ -name '*.log' -delete", "delete"),
+    ("find . -name x -exec rm {} ;", "delete"),
+    ("cd /tmp && rm -rf old", "delete"),
+])
+def test_action_type_looks_at_every_command_in_a_line(cmd, action):
+    assert one([decision(1, "Bash", {"command": cmd})]).action_type == action
+
+
+def test_command_segments_split_on_operators_and_subshells():
+    from agenttrail.enrich import command_programs, command_segments
+    assert command_segments("a -x && b | c; d") == [["a", "-x"], ["b"], ["c"], ["d"]]
+    assert [p for p, _ in command_programs("(crontab -l; echo hi) | crontab -")] == ["crontab", "echo", "crontab"]
+    assert [p for p, _ in command_programs("FOO=1 sudo env nohup rm -rf x")] == ["rm"]
+    assert command_programs("") == [] and command_programs("   ") == []
+
+
+def test_unbalanced_quotes_do_not_crash_command_parsing():
+    from agenttrail.enrich import command_programs
+    assert command_programs("echo 'unterminated")        # falls back to plain splitting

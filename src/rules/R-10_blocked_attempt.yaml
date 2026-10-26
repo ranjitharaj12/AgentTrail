@@ -11,4 +11,9 @@ match:
     - action_type: network
     - net_dest: {exists: true}
     - tool: Bash
-      args.command: {regex: '\brm\s+(?:-\S+\s+)*-\S*[rR]|\bgit\s+push\b.*(--force\b|\s-f\b)'}
+      args.command:
+        any_regex:
+          - '\brm\s+(?:-\S+\s+)*(-\S*[rR]|--recursive)'
+          - '\bgit\s+push\b.*(--force\b|\s-f\b)'
+          - '\bfind\b.*\s(-delete\b|-exec\s+(rm|shred)\b)'
+          - '\bxargs\s+(?:-\S+\s+)*(rm|shred)\b'

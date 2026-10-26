@@ -1,0 +1,3 @@
+# Red already means "alert" in this app, so keep Streamlit's accent colour neutral.
+[theme]
+primaryColor = "#2f6fed"

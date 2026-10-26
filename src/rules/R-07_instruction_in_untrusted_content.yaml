@@ -13,6 +13,11 @@ sequence:
           - '(?i)\b(note|message|instructions?|important|todo)\b[^.\n]{0,20}\b(to|for)\s+(the\s+)?(ai|assistants?|agents?|llm|model|claude)\b'
           - '(?i)\bignore\s+(all\s+|any\s+)?(previous|prior|above)\s+instructions\b'
           - '(?i)\bdo(n''t|\s+not)\s+(mention|tell|reveal|inform)\b'
+          # Concealment in other words: "skip mentioning it", "without telling", "keep this quiet"
+          - '(?i)\b(skip|omit|avoid|without)\s+(mention|mentioning|telling|reporting|noting)\b'
+          - '(?i)\bkeep\s+(this|it|that)\s+(quiet|secret|hidden|private)\b'
+          # An instruction to move a credential file's contents somewhere
+          - '(?i)\b(paste|include|attach|send|upload|post|copy)\b[^.\n]{0,40}\b(contents?|text|output)\s+of\b[^.\n]{0,40}(~/|/\.|\.ssh|\.aws|\.env|credential|token|secret|hosts\.yml)'
           - '(?i)\bbefore\s+(you\s+)?(continue|proceed|summari[sz]ing)\b.*\b(read|send|post|upload|run)\b'
   - name: risky_action
     within: 6

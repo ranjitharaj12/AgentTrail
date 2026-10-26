@@ -21,7 +21,7 @@ def test_fixture_and_label_are_consistent(fx):
     assert [e.seq for e in events] == list(range(1, len(events) + 1))   # 1..n, in order
     assert set(label.malicious_event_ids) <= ids                          # labels point at real events
     assert label.malicious == bool(label.malicious_event_ids)
-    assert ("attack" in fx.parent.name) == label.malicious                # folder matches label
+    assert (fx.parent.name in ("attack", "heldout", "explainer")) == label.malicious    # folder matches label
     # every tool_result has a matching tool_decision
     decided = {e.tool_use_id for e in events if e.event_type == "tool_decision"}
     assert {e.tool_use_id for e in events if e.event_type == "tool_result"} <= decided
@@ -182,3 +182,5 @@ def test_b14_vendored_read_is_third_party_then_user_prompt_resets_intent():
 def test_benign_set_is_complete():
     assert len(list((ROOT / "fixtures/benign").glob("*.json"))) == 15
     assert len(list((ROOT / "fixtures/attack").glob("*.json"))) == 8
+    assert len(list((ROOT / "fixtures/heldout").glob("*.json"))) == 4     # h01-h02 retired, h03-h04 current
+    assert len(list((ROOT / "fixtures/explainer").glob("*.json"))) == 1

@@ -107,5 +107,6 @@ class Label(BaseModel):
     session_id: str
     malicious: bool
     malicious_event_ids: list[str] = Field(default_factory=list)
+    trigger_event_id: Optional[str] = None   # the content that caused the attack, when there is one
     scenario: str = ""
     notes: str = ""

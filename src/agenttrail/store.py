@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS labels (
     session_id TEXT PRIMARY KEY,
     malicious INTEGER NOT NULL,
     malicious_event_ids TEXT NOT NULL,
-    scenario TEXT, notes TEXT
+    scenario TEXT, notes TEXT,
+    trigger_event_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_session ON events (session_id, seq);
 """
@@ -40,6 +41,9 @@ def connect(db_path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(labels)")}
+    if "trigger_event_id" not in cols:                      # database made before triggers existed
+        conn.execute("ALTER TABLE labels ADD COLUMN trigger_event_id TEXT")
     return conn
 
 
@@ -63,9 +67,10 @@ def save_events(conn: sqlite3.Connection, events: list[Event]) -> None:
 
 def save_label(conn: sqlite3.Connection, label: Label) -> None:
     conn.execute(
-        "INSERT OR REPLACE INTO labels VALUES (?, ?, ?, ?, ?)",
-        (label.session_id, int(label.malicious),
-         json.dumps(label.malicious_event_ids), label.scenario, label.notes),
+        "INSERT OR REPLACE INTO labels (session_id, malicious, malicious_event_ids, scenario, notes, trigger_event_id) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (label.session_id, int(label.malicious), json.dumps(label.malicious_event_ids),
+         label.scenario, label.notes, label.trigger_event_id),
     )
     conn.commit()
 
