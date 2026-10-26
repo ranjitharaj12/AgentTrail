@@ -17,3 +17,7 @@ retired_heldout: [s-h01, s-h02]
 
 # Sessions that test the explainer, not detection. Reported in their own row; never counted as attacks.
 explainer_injection: [s-x01]
+
+# The eight scripted attack scenarios. Any other session that is not in a list above is shown as "yours" in the
+# interface (these are the sessions you add in the playground), and is never part of an evaluation.
+scripted_attacks: [s-a01, s-a02, s-a03, s-a04, s-a05, s-a06, s-a07, s-a08]

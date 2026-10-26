@@ -32,6 +32,13 @@ class World:
     def result(self, sid: str) -> SessionResult:
         return next(r for r in self.results if r.session_id == sid)
 
+    def set_label(self, r: SessionResult) -> str:
+        """Which group a session belongs to. Unlisted sessions are the user's own (the playground)."""
+        scripted = self.ctx.split.get("scripted_attacks")
+        if r.split == "attack" and scripted is not None and r.session_id not in scripted:
+            return "yours"
+        return r.split
+
 
 def load_world(db: Path, narratives_dir: Path = ROOT / "reports" / "narratives", use_drift: bool = True,
                embedder=None) -> World:
@@ -66,7 +73,7 @@ def session_rows(world: World, statuses: set[str] | None = None) -> list[dict]:
             "Session": r.session_id, "Status": STATUS_LABEL[r.status], "Score": r.risk.score,
             "Intent": first_prompt(world.events[r.session_id]), "Duration": fmt_duration(world.events[r.session_id]),
             "Events": r.n_events, "Top alert": f"{top.rule_id} {top.severity}: {top.title}" if top else "",
-            "Set": r.split, "Label (eval only)": "malicious" if r.malicious else "benign",
+            "Set": world.set_label(r), "Label (eval only)": "malicious" if r.malicious else "benign",
             "Narrative": ("Claude" if world.narratives.get(r.session_id, {}).get("usage", {}).get("input_tokens")
                           else "template" if r.session_id in world.narratives else ""),
         })

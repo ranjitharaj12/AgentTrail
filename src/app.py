@@ -120,7 +120,7 @@ else:
     r = world.result(sid)
     st.button("← All sessions", on_click=lambda: st.session_state.update(view="Sessions"))
     st.header(f"{sid}  ·  {ui.STATUS_LABEL[r.status]}")
-    st.caption(f"Project {r.project} · set: {r.split} · answer key says: {'malicious' if r.malicious else 'benign'} (not seen by the detector)")
+    st.caption(f"Project {r.project} · set: {world.set_label(r)} · answer key says: {'malicious' if r.malicious else 'benign'} (not seen by the detector)")
 
     m = st.columns(4)
     m[0].metric("Risk score (0 to 100)", r.risk.score)

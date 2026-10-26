@@ -106,13 +106,25 @@ export ANTHROPIC_API_KEY="..."
 .venv/bin/python -m agenttrail.explain --all --narrator claude --model claude-sonnet-5-5
 ```
 
+## Using the interface
+
+Start it with `.venv/bin/streamlit run app.py` (from `src`) and open <http://localhost:8501>.
+
+- **Sessions view.** Riskiest first: alerts, then the needs-review list, then the rest. Each row shows what the user asked, how long it ran, how many events, and the top alert. Filter by status, click a row (or use the picker underneath) and press **Open**.
+- **Session view.** The narrative, with every claim tagged by the events it cites; a *Why it scored this way* panel with each rule hit and its points; and the timeline. In the timeline, **flagged** rows fired a rule or a drift flag, the **trigger** row is the content the detector blames, and **cited** rows are the ones the narrative used. Tick *Only flagged, trigger and cited events* to cut a long session down, and use *Inspect an event* for the full redacted record.
+- **Links.** `?session=s-x01` opens a session directly. Good ones to start with: `s-a01` (a README tells the agent to send credentials out), `s-x01` (the planted text also tries to talk the explainer out of the alert), `s-a08` (needs review, no rule fires) and `s-b07` (a sensitive file the user asked about, so it stays clear).
+- **Reload data** in the sidebar picks up a changed database or new narratives.
+
+To try your own session without touching the real evaluation, see [`src/playground/README.md`](src/playground/README.md).
+
 ## Honest limitations
 
 - **Same author, same assumptions.** Fixtures, labels and rules were written by one person, so catching scripted attacks is weak evidence of catching real ones. The held-out misses show it.
 - **Synthetic data.** The sessions follow Claude Code's event format but were not captured from a live agent.
 - **Hand-written pattern lists are brittle.** Which paths count as secrets, which commands count as network or destructive: every list has gaps, and new attacks will find them.
 - **Drift is a weak signal.** Benign work tops out at a distance of 0.40 and attacks at 0.45 to 0.49. One scope-drift case clears its threshold by 0.001. The score uses the agent's own *stated* purpose, which a misleading agent can shape.
-- **Shell parsing is heuristic.** Paths and commands are inferred from text, so wildcards and nested subshells can be misread.
+- **Naming a file in the prompt softens the alert.** When the user's own prompt names a credentials file, the read and the "toxic flow" rule drop to Medium even if the file is then uploaded. The upload command itself stays High, so the example in the playground still alerts (80), but the rule is softer than it should be.
+- **Shell parsing is heuristic.** Paths and commands are inferred from text, so wildcards and nested subshells can be misread, and a curl-style `@file` argument is turned into a wrong path (the sensitive-path check still catches it, but "the user named this file" cannot match it).
 - **A few labels are judgement calls.** For example the "agent overreach" case (`find ~ -delete`) is a reasonable-people-could-differ label.
 - **MITRE ATLAS technique IDs on the rules are provisional** and need checking against the current catalog.
 - **Narratives are checked mechanically**, plus a Claude review. A human spot-check is still pending.

@@ -29,14 +29,27 @@ def load_all(db_path: Path, fixtures_dir: Path, labels_dir: Path,
             failures += 1
             print(f"FAIL {fx.name}: {e}", file=sys.stderr)
             continue
-        store.save_events(conn, events)
+        store.replace_session(conn, events)
         store.save_label(conn, label)
         print(f"ok   {fx.name}: {len(events)} events")
     return failures
 
 
-if __name__ == "__main__":
-    p = argparse.ArgumentParser()
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description="Validate, enrich and store the fixtures.")
     p.add_argument("--db", default=ROOT / "agenttrail.db", type=Path)
-    a = p.parse_args()
-    sys.exit(1 if load_all(a.db, ROOT / "fixtures", ROOT / "labels") else 0)
+    p.add_argument("--extra", type=Path, help="a folder with your own fixtures/ and labels/ subfolders, loaded as well")
+    a = p.parse_args(argv)
+    if a.extra and a.db.resolve() == (ROOT / "agenttrail.db").resolve():
+        print("Refusing to mix your own sessions into the main database (it would change the evaluation).\n"
+              "Use a separate one, e.g.  --db playground/playground.db", file=sys.stderr)
+        return 2
+    failures = load_all(a.db, ROOT / "fixtures", ROOT / "labels")
+    if a.extra:
+        print(f"-- your sessions from {a.extra}")
+        failures += load_all(a.db, a.extra / "fixtures", a.extra / "labels")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

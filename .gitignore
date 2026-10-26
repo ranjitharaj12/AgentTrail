@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# The Python 3.12 that uv downloads (quickstart step)
+src/.python/
+
+# The embedding model, about 64 MB, fetched on first use
+src/.cache/
+
+# Rebuilt by: python -m agenttrail.load
+src/agenttrail.db
+
+# macOS
+.DS_Store
+
+# Local tooling: keep the shared preview config, ignore anything personal that ends up beside it
+.claude/*
+!.claude/launch.json
+
+# Your own playground sessions and database (the example script itself stays tracked)
+src/playground/my/
+src/playground/*.db
+src/playground/narratives/

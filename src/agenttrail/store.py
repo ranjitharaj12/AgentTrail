@@ -65,6 +65,13 @@ def save_events(conn: sqlite3.Connection, events: list[Event]) -> None:
     conn.commit()
 
 
+def replace_session(conn: sqlite3.Connection, events: list[Event]) -> None:
+    """Store a session, removing any events a previous version of it had (a re-loaded session may be shorter)."""
+    for sid in {e.session_id for e in events}:
+        conn.execute("DELETE FROM events WHERE session_id = ?", (sid,))
+    save_events(conn, events)
+
+
 def save_label(conn: sqlite3.Connection, label: Label) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO labels (session_id, malicious, malicious_event_ids, scenario, notes, trigger_event_id) "

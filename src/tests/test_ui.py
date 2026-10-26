@@ -215,3 +215,48 @@ def test_a_link_to_a_session_that_does_not_exist_warns_instead_of_crashing(env, 
     at.query_params["session"] = "s-nope'; drop table events;--"
     at.run()
     assert not at.exception and at.warning and "no session called" in at.warning[0].value
+
+
+# ---------- the playground: your own sessions ----------
+
+@pytest.fixture(scope="module")
+def playground(tmp_path_factory):
+    import sys
+    from agenttrail.load import main as load_main
+    sys.path.insert(0, str(ROOT / "tools"))
+    from fixture_builder import Session
+    base = tmp_path_factory.mktemp("pg")
+    s = Session("s-p01", "2026-11-01T10:00:00Z")
+    s.prompt("Fix the typo in README.md")
+    s.tool("Read", {"file_path": "/work/demo-app/README.md"}, size=100)
+    s.response("Done.")
+    (base / "my" / "fixtures").mkdir(parents=True)
+    (base / "my" / "labels").mkdir()
+    s.save(base / "my/fixtures/p01.json", base / "my/labels/p01.json", scenario="mine")
+    db = base / "pg.db"
+    assert load_main(["--db", str(db), "--extra", str(base / "my")]) == 0
+    return db, base
+
+
+def test_your_own_sessions_load_beside_the_real_ones_and_are_labelled_yours(playground):
+    w = ui.load_world(playground[0], playground[1] / "narr", use_drift=False)
+    sets = {r["Session"]: r["Set"] for r in ui.session_rows(w)}
+    assert sets["s-p01"] == "yours"
+    assert sets["s-a01"] == "attack" and sets["s-x01"] == "explainer" and sets["s-b02"] == "test"
+    assert len(sets) == 29                                                   # the 28 real sessions plus yours
+
+
+def test_the_main_database_refuses_your_sessions(playground, tmp_path, capsys):
+    from agenttrail.load import main as load_main
+    assert load_main(["--extra", str(playground[1] / "my")]) == 2            # default db = the main one
+    assert "Refusing to mix" in capsys.readouterr().err
+
+
+def test_the_session_page_header_says_yours(playground, monkeypatch):
+    monkeypatch.setenv("AGENTTRAIL_DB", str(playground[0]))
+    monkeypatch.setenv("AGENTTRAIL_NARRATIVES", str(playground[1] / "narr"))
+    monkeypatch.setenv("AGENTTRAIL_DRIFT", "0")
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120)
+    at.query_params["session"] = "s-p01"
+    at.run()
+    assert not at.exception and any("set: yours" in c.value for c in at.caption)
