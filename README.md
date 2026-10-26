@@ -87,7 +87,7 @@ uv pip install --python .venv/bin/python -r requirements.txt   # or: .venv/bin/p
 
 ```bash
 .venv/bin/python -m agenttrail.load        # validate and enrich the 28 sessions into SQLite
-.venv/bin/python -m pytest -q              # 339 tests
+.venv/bin/python -m pytest -q              # 379 tests
 .venv/bin/python -m agenttrail.score       # ranked sessions (first run downloads a 64 MB embedding model)
 .venv/bin/python -m agenttrail.eval        # the evaluation report
 .venv/bin/streamlit run app.py             # the interface; open ?session=s-x01 to jump to one session
@@ -141,7 +141,7 @@ The session-level LLM judge (designed; its score slot and evaluation column exis
 - `src/rules/` the YAML rules; `src/config/` projects, scoring, drift and the data split
 - `src/fixtures/` the 28 synthetic sessions and `src/labels/` their answer keys (all fake canary secrets, safe to publish)
 - `src/tests/` the test suite; `src/app.py` the interface; `src/reports/` generated reports
-- `docs/` screenshots and the [demo plan](docs/DEMO.md)
+- `docs/` screenshots, the [system design](docs/SYSTEM_DESIGN.md) and the [demo plan](docs/DEMO.md)
 
 ## A note on how the evaluation is kept honest
 
