@@ -2,13 +2,11 @@
 
 **Behavior analytics and cited incident narratives for AI coding agents.**
 
-![A short tour: an alert session, its story and its timeline](docs/img/demo.gif)
-
 AgentTrail watches what a coding agent does, decides whether a session stayed within what the user asked, and explains the sessions that did not. It plays the role for agents that UEBA tools play for people and service accounts.
 
 > **Status: a prototype on synthetic data.** It runs on 28 scripted sessions written in the shape of Claude Code's OpenTelemetry events. There is no live agent and no collector. The results below are honest about what that does and does not prove.
 
-![The session list, riskiest first](docs/img/sessions.jpg)
+![A short tour: an alert session, its story and its timeline](docs/img/demo.gif)
 
 ## Why agents need their own monitoring
 
