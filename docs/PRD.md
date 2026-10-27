@@ -42,12 +42,12 @@ The result is a blind spot: when an agent misbehaves, there is no baseline to co
 
 | Persona | Role | What they need from AgentTrail |
 | --- | --- | --- |
-| Priya, SOC analyst | Triages alerts across the company | A ranked list of risky agent sessions and a narrative she can act on without reading transcripts |
-| Marcus, security engineer | Owns detection content | Readable rules he can tune, a clear event schema, and measured false-positive rates |
-| Dana, developer | Uses Claude Code daily | Confidence her agent did only what she asked, with near-zero setup and no slowdown |
-| Leo, AI platform lead | Rolls out agents to teams | Evidence of what agents actually do, to set policy and least-privilege permissions |
+| SOC analyst | Triages alerts across the company | A ranked list of risky agent sessions and a narrative they can act on without reading transcripts |
+| security engineer | Owns detection content | Readable rules they can tune, a clear event schema, and measured false-positive rates |
+| developer | Uses Claude Code daily | Confidence their agent did only what they asked, with near-zero setup and no slowdown |
+| AI platform lead | Rolls out agents to teams | Evidence of what agents actually do, to set policy and least-privilege permissions |
 
-The POC is built primarily for Priya and Marcus; Dana's sessions are the data source in the real-world design (mocked in the POC), and Leo is the audience for the README's "why this matters."
+The POC is built primarily for SOC and security engineer; developer's sessions are the data source in the real-world design (mocked in the POC)
 
 ## Use cases
 

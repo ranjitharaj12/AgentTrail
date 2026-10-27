@@ -2,6 +2,8 @@
 
 **Behavior analytics and cited incident narratives for AI coding agents.**
 
+![A short tour: an alert session, its story and its timeline](docs/img/demo.gif)
+
 AgentTrail watches what a coding agent does, decides whether a session stayed within what the user asked, and explains the sessions that did not. It plays the role for agents that UEBA tools play for people and service accounts.
 
 > **Status: a prototype on synthetic data.** It runs on 28 scripted sessions written in the shape of Claude Code's OpenTelemetry events. There is no live agent and no collector. The results below are honest about what that does and does not prove.
@@ -141,7 +143,7 @@ The session-level LLM judge (designed; its score slot and evaluation column exis
 - `src/rules/` the YAML rules; `src/config/` projects, scoring, drift and the data split
 - `src/fixtures/` the 28 synthetic sessions and `src/labels/` their answer keys (all fake canary secrets, safe to publish)
 - `src/tests/` the test suite; `src/app.py` the interface; `src/reports/` generated reports
-- `docs/` screenshots, the [system design](docs/SYSTEM_DESIGN.md) and the [demo plan](docs/DEMO.md)
+- `docs/` screenshots, the [PRD](docs/PRD.md), the [system design](docs/SYSTEM_DESIGN.md) and the [demo plan](docs/DEMO.md)
 
 ## A note on how the evaluation is kept honest
 
