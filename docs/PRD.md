@@ -85,17 +85,11 @@ In production, AgentTrail is a three-stage pipeline shaped like a SIEM: Claude C
 ```mermaid
 flowchart LR
   A[Claude Code<br/>OTel events] --> B[OTel Collector<br/>redact and hash]
-  B --> C[Validate and enrich]
+  B --> C[Validate<br/>and enrich]
   C --> D[(Event store)]
-  D --> E[Single-event rules]
-  E --> F[Intent drift<br/>local embeddings]
-  F --> G[Sequence rules]
-  G --> H[Reply check]
-  H --> I[Risk score 0 to 100]
-  I --> J{Status}
-  J -->|alert| K[Cited narrative]
-  J -->|needs review| L[Review list]
-  J -->|clear| M[No action]
+  D --> E[Detection<br/>rules, drift, reply check]
+  E --> F[Risk score<br/>and status]
+  F --> G[Cited narrative<br/>for alerts]
 ```
 
 Every tool call is captured, stored and scored; only sessions above the risk threshold are sent to Claude for a cited narrative. Swapping the Collector's exporter for Elastic or Splunk turns this into a SIEM content pack. In the POC, mocked sessions replace the first two boxes.
@@ -196,63 +190,23 @@ A session is flagged, and raises an alert, when its risk score reaches the thres
 
 Results are reported as a per-layer table (rules only, then adding baseline, drift (single action, window and run), and the session judge), with held-out variants in their own column. That table, including where it falls short, is the centerpiece of the README.
 
-### Event schema
-
-One row per event. Fixtures use the OTel attribute names in the source column, so the same loader accepts live Collector output later. Fields marked fixture exist only in the mocked data for now. The schema rejects unknown fields, so a typo cannot silently weaken a detection.
-
-| Field | Type | OTel source | Notes |
-| --- | --- | --- | --- |
-| event_id | string | session.id + event.sequence | Cited by narratives |
-| session_id | string | session.id | |
-| ts | ISO 8601 | event.timestamp | |
-| seq | integer | event.sequence | Orders events within a session |
-| project | string | Resource attribute (OTEL_RESOURCE_ATTRIBUTES) | A project config maps each name to its root path, used to classify paths |
-| event_type | enum | event.name | user_prompt, tool_decision, tool_result, assistant_response, mcp_server_connection, plugin_loaded |
-| turn_id | string | prompt.id | Groups every event under the user prompt that caused it |
-| actor | enum | fixture | main agent or subagent; subagent events inherit the parent's turn |
-| intent | string | Derived from user_prompt text | Latest prompt plus the two before it |
-| tool | string | tool_name | |
-| tool_source | enum | tool_source | Built-in or MCP |
-| mcp_server | string | MCP tool name; server_name on mcp_server_connection | Empty for built-in tools |
-| tool_use_id | string | tool_use_id | Joins a tool_decision to its tool_result |
-| decision | enum | decision + source on tool_decision | Accepted or rejected, by config or by the user |
-| permission_mode | enum | permission_mode on tool_decision | Context for risk: auto-accept modes raise it |
-| stated_purpose | string | description inside tool_parameters | The agent's own stated reason for a command |
-| args | object | tool_parameters and tool_input | Fixtures use fake canary secrets only |
-| paths, path_class, net_dest, action_type | derived | Parsed from args | path_class: project / home / sensitive / system |
-| trust_level | enum | Derived | For content-ingesting events: user-authored project file, third-party or vendored code, web, MCP result |
-| content_excerpt | string | fixture | Short excerpt of ingested content; stands in for tool output content (see Future work), since OTel carries size only |
-| outcome | enum | success, duration_ms on tool_result | |
-| result_size | integer | tool_result_size_bytes | Volume signal |
-| response | string | assistant_response | What the agent reported to the user |
-| signals | list | Filled by detection | e.g. ["R-08"] |
-| drift_score | float | Filled by detection | 0 = on intent, 1 = unrelated; empty when skipped as routine |
-| judge_verdict | object | Filled by the session judge (FR-7) | Per-session: verdict for each turn, drift score 0 to 1, cited event IDs; empty when the judge is off |
-
-Each fixture also has a label file listing whether the session is benign or malicious, the ground-truth malicious event IDs, and the event that triggered the attack where there is one.
-
-### Detection catalog and threat model
+### Threat model and example detections
 
 **Threat model.** The developer is trusted; the agent is semi-trusted. Content the agent ingests is graded by trust: user-authored project files are trusted; third-party or vendored code (even inside the project), web pages and MCP results are low-trust and may carry injected instructions. Subagents act on the parent agent's instructions within the user's turn. The attacker's goals are credential theft, data exfiltration, persistence and destruction, and hiding those actions from both the user and the analyst, including by manipulating AgentTrail's explainer. Out of scope: a malicious developer, a compromised model provider, and tampering with the telemetry itself.
 
-#### Starter detections (v1)
+#### Example detections
 
-| ID | Detection | Layer | Severity |
-| --- | --- | --- | --- |
-| R-01 | Read or processing of a sensitive path (`~/.ssh`, `~/.aws`, `.env*`, keychains, browser profiles, credential stores of common CLI tools, shell history) | Rule | High; Medium when the current intent names that path |
-| R-02 | Network call to a domain not in the project baseline | Baseline | Medium |
-| R-03 | Sensitive read followed by a shell command that uses the network (toxic flow) | Rule (sequence) | Critical; Medium when the intent names the file |
-| R-04 | Write to shell profiles, cron, `authorized_keys`, git hooks, launch agents (persistence) | Rule | High |
-| R-05 | Destructive commands reaching outside the project (`rm -rf`, find -delete, xargs rm, rsync --delete, force-push, disk tools) | Rule | High |
-| R-06 | Encoding or archiving (base64, xxd, compressed archives) followed by network use | Rule (sequence) | Medium |
-| R-07 | Instruction-like text in low-trust content (wording addressed to the agent, concealment wording, requests to paste a credential file), followed within 6 events by a rule hit with no new prompt: the likely injection source | Rule (sequence) | High |
-| R-08 | Unprompted course change: a rule hit or drift flag within 8 events of low-trust content, with no new user prompt in between | Rule (sequence) + drift | Critical |
-| R-09 | Cross-server MCP flow: data read through one MCP server, written out through another the intent does not call for | Rule (sequence) | High |
-| R-10 | Blocked attempt: a tool_decision rejected by config or the user, on a sensitive path, the network or a destructive command | Rule | Medium |
-| R-11 | Environment change mid-session: a new MCP server connects or a plugin loads after the first user prompt | Rule | Medium |
-| R-12 | Unreported action: a High or Critical event that the agent's reply to the user never mentions (no match on the event's path, domain or command name) | Rule (check) | High |
-| D-01 | Drift above threshold against the current intent (event, window or run) | Drift | Medium |
+A few examples show the kind of behavior the product is meant to catch:
 
-R-08 is the headline detection. A legitimate change of direction is normally preceded by a user prompt; an injected one happens between prompts, right after the agent ingests low-trust content. Agents also change course on their own (a failing test leads to other files), so R-08 fires only when that change coincides with a rule hit or drift flag after low-trust content. Subagent work inherits the user's turn and is judged the same way. It needs only what OTel already provides: `prompt.id` for turn boundaries and tool inputs to grade trust.
+| Example | What it catches | Severity |
+| --- | --- | --- |
+| Sensitive file read | The agent reads credentials or keys (`~/.ssh`, `~/.aws`, `.env` files), softened when the user's request names that file | High |
+| Data leaving the machine | A sensitive read followed by a command that sends data over the network | Critical |
+| Persistence | A write to shell profiles, cron jobs or `authorized_keys` | High |
+| Instruction in untrusted content | Text in a file, web page or tool result that tells the agent what to do, followed by a risky action | High |
+| Unprompted course change | Untrusted content comes in, then something risky or off-intent happens with no new user prompt in between | Critical |
+| Unreported action | A serious action the agent's reply to the user never mentions | High |
+
+The unprompted course change is the headline detection. A legitimate change of direction is normally preceded by a user prompt; an injected one happens between prompts, right after the agent ingests low-trust content. Agents also change course on their own (a failing test leads to other files), so it fires only when that change coincides with a rule hit or drift flag after low-trust content. Subagent work inherits the user's turn and is judged the same way. It needs only what OTel already provides: `prompt.id` for turn boundaries and tool inputs to grade trust.
 
 Each rule maps to a MITRE ATLAS technique and, where it fits, an OWASP agentic risk category. Mappings are finalized during implementation.

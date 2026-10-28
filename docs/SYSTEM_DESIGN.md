@@ -32,17 +32,11 @@ The prototype runs on 28 synthetic sessions (15 benign, 8 scripted attacks, 4 he
 
 ```mermaid
 flowchart LR
-  A[Agent events<br/>OTel-shaped JSON] --> B[Validate and enrich]
-  B --> C[(SQLite event store)]
-  C --> D[Single-event rules]
-  D --> E[Intent drift<br/>local embeddings]
-  E --> F[Sequence rules]
-  F --> G[Reply check]
-  G --> H[Risk score 0 to 100]
-  H --> I{Status}
-  I -->|alert| J[Cited narrative]
-  I -->|needs review| K[Review list]
-  I -->|clear| L[No action]
+  A[Agent events<br/>OTel-shaped JSON] --> B[Validate<br/>and enrich]
+  B --> C[(Event store)]
+  C --> D[Detection<br/>rules, drift, reply check]
+  D --> E[Risk score<br/>and status]
+  E --> F[Cited narrative<br/>for alerts]
 ```
 
 Rules, drift and the reply check each add hits to a session; the score turns those hits into a status, and only alerts go on to explanation.
@@ -76,6 +70,41 @@ Raw events say what tool ran and with which arguments; they do not say whether t
 | Result linkage | A result copies paths, class, destination and trust from the decision it answers, joined by tool-use ID. | Results carry no arguments of their own. |
 
 Two principles hold throughout. Enrichment is deterministic and runs once, at load, so the same event always gets the same facts. And it is honest about its limits: paths in shell commands are inferred from text, so wildcards and nested subshells can be misread. Commands are now split into their simple parts, but this is still a heuristic; a proper shell parser would be the upgrade.
+
+## Event schema
+
+One row per event. Fixtures use the OTel attribute names in the source column, so the same loader accepts live Collector output later. Fields marked fixture exist only in the mocked data for now. The schema rejects unknown fields, so a typo cannot silently weaken a detection.
+
+| Field | Type | OTel source | Notes |
+| --- | --- | --- | --- |
+| event_id | string | session.id + event.sequence | Cited by narratives |
+| session_id | string | session.id | |
+| ts | ISO 8601 | event.timestamp | |
+| seq | integer | event.sequence | Orders events within a session |
+| project | string | Resource attribute (OTEL_RESOURCE_ATTRIBUTES) | A project config maps each name to its root path, used to classify paths |
+| event_type | enum | event.name | user_prompt, tool_decision, tool_result, assistant_response, mcp_server_connection, plugin_loaded |
+| turn_id | string | prompt.id | Groups every event under the user prompt that caused it |
+| actor | enum | fixture | main agent or subagent; subagent events inherit the parent's turn |
+| intent | string | Derived from user_prompt text | Latest prompt plus the two before it |
+| tool | string | tool_name | |
+| tool_source | enum | tool_source | Built-in or MCP |
+| mcp_server | string | MCP tool name; server_name on mcp_server_connection | Empty for built-in tools |
+| tool_use_id | string | tool_use_id | Joins a tool_decision to its tool_result |
+| decision | enum | decision + source on tool_decision | Accepted or rejected, by config or by the user |
+| permission_mode | enum | permission_mode on tool_decision | Context for risk: auto-accept modes raise it |
+| stated_purpose | string | description inside tool_parameters | The agent's own stated reason for a command |
+| args | object | tool_parameters and tool_input | Fixtures use fake canary secrets only |
+| paths, path_class, net_dest, action_type | derived | Parsed from args | path_class: project / home / sensitive / system |
+| trust_level | enum | Derived | For content-ingesting events: user-authored project file, third-party or vendored code, web, MCP result |
+| content_excerpt | string | fixture | Short excerpt of ingested content; stands in for tool output content, since OTel carries size only |
+| outcome | enum | success, duration_ms on tool_result | |
+| result_size | integer | tool_result_size_bytes | Volume signal |
+| response | string | assistant_response | What the agent reported to the user |
+| signals | list | Filled by detection | e.g. ["R-08"] |
+| drift_score | float | Filled by detection | 0 = on intent, 1 = unrelated; empty when skipped as routine |
+| judge_verdict | object | Filled by the session judge (see Session judge) | Per-session: verdict for each turn, drift score 0 to 1, cited event IDs; empty when the judge is off |
+
+Each fixture also has a label file listing whether the session is benign or malicious, the ground-truth malicious event IDs, and the event that triggered the attack where there is one.
 
 ## Detection
 
