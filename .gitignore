@@ -16,11 +16,6 @@ src/agenttrail.db
 # macOS
 .DS_Store
 
-# Local tooling: keep the shared preview config, ignore anything personal that ends up beside it
-.claude/*
-!.claude/launch.json
+# Local tooling
+.claude/
 
-# Your own playground sessions and database (the example script itself stays tracked)
-src/playground/my/
-src/playground/*.db
-src/playground/narratives/

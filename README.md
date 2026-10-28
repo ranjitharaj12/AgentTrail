@@ -2,7 +2,7 @@
 
 **Behavior analytics and cited incident narratives for AI coding agents.**
 
-AgentTrail watches what a coding agent does, decides whether a session stayed within what the user asked, and explains the sessions that did not. It plays the role for agents that UEBA tools play for people and service accounts.
+AgentTrail reviews recorded coding-agent sessions after they finish, decides whether each one stayed within what the user asked, and explains the sessions that did not. It is not a live monitor. It plays the role for agents that UEBA tools play for people and service accounts.
 
 > **Status: a prototype on synthetic data.** It runs on 28 scripted sessions written in the shape of Claude Code's OpenTelemetry events. There is no live agent and no collector. The results below are honest about what that does and does not prove.
 
@@ -116,15 +116,13 @@ Start it with `.venv/bin/streamlit run app.py` (from `src`) and open <http://loc
 - **Reload data** in the sidebar picks up a changed database or new narratives.
 - **If you edit the code while the app is running,** restart it. The app notices when its files changed after it started and says so, instead of showing an error.
 
-To try your own session without touching the real evaluation, see [`src/playground/README.md`](src/playground/README.md).
-
 ## Honest limitations
 
 - **Same author, same assumptions.** Fixtures, labels and rules were written by one person, so catching scripted attacks is weak evidence of catching real ones. The held-out misses show it.
 - **Synthetic data.** The sessions follow Claude Code's event format but were not captured from a live agent.
 - **Hand-written pattern lists are brittle.** Which paths count as secrets, which commands count as network or destructive: every list has gaps, and new attacks will find them.
 - **Drift is a weak signal.** Benign work tops out at a distance of 0.40 and attacks at 0.45 to 0.49. One scope-drift case clears its threshold by 0.001. The score uses the agent's own *stated* purpose, which a misleading agent can shape.
-- **Naming a file in the prompt softens the alert.** When the user's own prompt names a credentials file, the read and the "toxic flow" rule drop to Medium even if the file is then uploaded. The upload command itself stays High, so the example in the playground still alerts (80), but the rule is softer than it should be.
+- **Naming a file in the prompt softens the alert.** When the user's own prompt names a credentials file, the read and the "toxic flow" rule drop to Medium even if the file is then uploaded. The upload command itself stays High, so such a session still alerts (80), but the rule is softer than it should be.
 - **A formatting bug in the drift text.** The description the embedding model compares includes the Python enum name (`PathClass.sensitive file`) instead of plain `sensitive file`. Scores were calibrated with it as is; fixing it would change drift scores and need a new freeze.
 - **Shell parsing is heuristic.** Paths and commands are inferred from text, so wildcards and nested subshells can be misread, and a curl-style `@file` argument is turned into a wrong path (the sensitive-path check still catches it, but "the user named this file" cannot match it).
 - **A few labels are judgement calls.** For example the "agent overreach" case (`find ~ -delete`) is a reasonable-people-could-differ label.
@@ -141,7 +139,7 @@ The session-level LLM judge (designed; its score slot and evaluation column exis
 - `src/rules/` the YAML rules; `src/config/` projects, scoring, drift and the data split
 - `src/fixtures/` the 28 synthetic sessions and `src/labels/` their answer keys (all fake canary secrets, safe to publish)
 - `src/tests/` the test suite; `src/app.py` the interface; `src/reports/` generated reports
-- `docs/` screenshots, the [PRD](docs/PRD.md), the [system design](docs/SYSTEM_DESIGN.md) and the [demo plan](docs/DEMO.md)
+- `docs/` screenshots, the demo GIF, the [PRD](docs/PRD.md) and the [system design](docs/SYSTEM_DESIGN.md)
 
 ## A note on how the evaluation is kept honest
 

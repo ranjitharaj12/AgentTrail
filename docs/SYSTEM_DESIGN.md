@@ -4,7 +4,7 @@ Oct 25, 2026
 
 ## Overview
 
-AgentTrail watches what an AI coding agent does, decides whether a session stayed within what the user asked, and explains the sessions that did not. It plays the role for agents that UEBA tools play for people and service accounts.
+AgentTrail reviews recorded coding-agent sessions, decides whether a session stayed within what the user asked, and explains the sessions that did not. It plays the role for agents that UEBA tools play for people and service accounts.
 
 Agents need their own monitoring because they act with the developer's credentials, work toward open-ended goals (so fixed allow-lists either block useful work or miss misuse), can be redirected by content they read (a README, a web page, a tool result), and leave logs that no analyst reads until something has already gone wrong.
 
@@ -217,7 +217,7 @@ Recorded events are attacker-controlled text, so they reach the screen only as p
 
 **Why an event was flagged.** The session page opens with a verdict banner (status, severity, score, the most serious rule and the likely trigger), all taken from the detector, followed by the narrative as one card per section. The reasons under each flagged event are not written separately: a small module (`why.py`) walks each rule's own match definition against the event, so the evidence shown (the path, the destination, the matched sentence, the drift distance, the names the reply failed to mention) cannot disagree with what the rule did, and stays correct when a rule file is edited. Where a severity was lowered, for example because the user's prompt named the file, the card says so.
 
-**Trying it.** A playground builds a separate database from the 28 real sessions plus a session the user writes, so experiments never touch the evaluation numbers. The app also checks whether its code changed after it started and shows a restart notice instead of an error.
+**Restarts.** The app checks whether its code changed after it started and shows a restart notice instead of an error.
 
 ## Where things stand
 
@@ -234,7 +234,7 @@ Detection works on the synthetic set but did not generalise to the held-out vari
 - Two results are fragile: a04 reaches the alert threshold on rules alone only at exactly 50 (drift lifts it to 95), and a08's drift flag clears its threshold by 0.001. a08 cannot reach an alert by design and appears in the review tier instead.
 - Narratives are checked mechanically and by a Claude review, not yet by a person, and the sample is only 12 claims.
 - A known flaw: results of `git push` are labelled web content, because broadening the network commands made a push count as a fetch. That could make R-08 pick a push result as a trigger. Fixing it changes frozen detection code, so it needs a new freeze and a fresh round of held-out variants.
-- Naming a file in the prompt softens the alert. When the user's own prompt names a credentials file, the read and the toxic-flow rule (R-03) drop to Medium even if the file is then uploaded. The upload command itself stays High, so a session like that still alerts (80 in the playground example), but the rule is softer than it should be.
+- Naming a file in the prompt softens the alert. When the user's own prompt names a credentials file, the read and the toxic-flow rule (R-03) drop to Medium even if the file is then uploaded. The upload command itself stays High, so a session like that still alerts (80), but the rule is softer than it should be.
 - A curl-style `@file` argument is turned into a wrong path (`/work/demo-app/@/home/dev/...`). The sensitive-path check still catches it, but the "user named this file" test cannot match it. Fixing it changes frozen detection code, so it needs a new freeze.
 - MITRE ATLAS IDs on the rules are provisional and must be checked against the current catalog.
 
